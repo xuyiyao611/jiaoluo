@@ -3,6 +3,7 @@
 #include <QStackedWidget>
 
 #include "difficulty_select_page.h"
+#include "game_page.h"
 #include "home_page.h"
 #include "landing_page.h"
 
@@ -11,7 +12,8 @@ MainWindow::MainWindow(QWidget *parent)
       m_stack(new QStackedWidget(this)),
       m_landingPage(new LandingPage(this)),
       m_homePage(new HomePage(this)),
-      m_difficultySelectPage(new DifficultySelectPage(this))
+      m_difficultySelectPage(new DifficultySelectPage(this)),
+      m_gamePage(new GamePage(this))
 {
     buildUi();
     bindSignals();
@@ -29,6 +31,7 @@ void MainWindow::buildUi()
     m_stack->addWidget(m_landingPage);
     m_stack->addWidget(m_homePage);
     m_stack->addWidget(m_difficultySelectPage);
+    m_stack->addWidget(m_gamePage);
     setCentralWidget(m_stack);
 }
 
@@ -59,6 +62,15 @@ void MainWindow::bindSignals()
     connect(m_difficultySelectPage, &DifficultySelectPage::difficultyChosen, this, [this](Difficulty difficulty) {
         m_state.selectedDifficulty = difficulty;
         syncStateToViews();
+        switchScene(SceneKey::Game);
+    });
+
+    connect(m_gamePage, &GamePage::backToDifficultyRequested, this, [this]() {
+        switchScene(SceneKey::DifficultySelect);
+    });
+
+    connect(m_gamePage, &GamePage::backToHomeRequested, this, [this]() {
+        switchScene(SceneKey::Home);
     });
 }
 
@@ -75,6 +87,8 @@ void MainWindow::syncStateToViews()
 {
     m_homePage->setCoins(m_state.coins);
     m_difficultySelectPage->setSelectedDifficulty(m_state.selectedDifficulty);
+    m_gamePage->setCoins(m_state.coins);
+    m_gamePage->setDifficulty(m_state.selectedDifficulty);
 }
 
 void MainWindow::switchScene(SceneKey scene)
@@ -90,6 +104,9 @@ void MainWindow::switchScene(SceneKey scene)
         break;
     case SceneKey::DifficultySelect:
         m_stack->setCurrentWidget(m_difficultySelectPage);
+        break;
+    case SceneKey::Game:
+        m_stack->setCurrentWidget(m_gamePage);
         break;
     }
 }

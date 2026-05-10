@@ -8,6 +8,7 @@ class QStackedWidget;
 class LandingPage;
 class HomePage;
 class DifficultySelectPage;
+class GamePage;
 
 class MainWindow : public QMainWindow
 {
@@ -29,4 +30,5 @@ private:
     LandingPage *m_landingPage;
     HomePage *m_homePage;
     DifficultySelectPage *m_difficultySelectPage;
+    GamePage *m_gamePage;
 };

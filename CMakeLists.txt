@@ -18,6 +18,8 @@ qt_add_executable(CornerMatchQt
     src/app/app_state.cpp
     src/app/application_controller.h
     src/app/application_controller.cpp
+    src/ui/game_page.h
+    src/ui/game_page.cpp
     src/ui/difficulty_select_page.h
     src/ui/difficulty_select_page.cpp
     src/ui/main_window.h

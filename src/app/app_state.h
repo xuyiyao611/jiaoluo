@@ -5,7 +5,8 @@
 enum class SceneKey {
     Landing,
     Home,
-    DifficultySelect
+    DifficultySelect,
+    Game
 };
 
 enum class Difficulty {
