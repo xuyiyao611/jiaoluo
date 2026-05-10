@@ -14,8 +14,12 @@ qt_standard_project_setup()
 
 qt_add_executable(CornerMatchQt
     src/main.cpp
+    src/app/app_state.h
+    src/app/app_state.cpp
     src/app/application_controller.h
     src/app/application_controller.cpp
+    src/ui/difficulty_select_page.h
+    src/ui/difficulty_select_page.cpp
     src/ui/main_window.h
     src/ui/main_window.cpp
     src/ui/landing_page.h
