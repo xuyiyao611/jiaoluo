@@ -1,11 +1,13 @@
 #include "main_window.h"
 
+#include <QMessageBox>
 #include <QStackedWidget>
 
 #include "difficulty_select_page.h"
 #include "game_page.h"
 #include "home_page.h"
 #include "landing_page.h"
+#include "result_dialog.h"
 
 namespace {
 
@@ -33,8 +35,8 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::buildUi()
 {
     setWindowTitle(QStringLiteral("角落消消"));
-    resize(1280, 800);
-    setMinimumSize(1000, 680);
+    resize(1360, 920);
+    setMinimumSize(1180, 820);
 
     m_stack->addWidget(m_landingPage);
     m_stack->addWidget(m_homePage);
@@ -98,10 +100,16 @@ void MainWindow::bindSignals()
         if (result.clearedTarget) {
             m_state.coins += result.coinReward;
             applyFragmentRewards(result);
+            m_homePage->setActionMessage(QStringLiteral("挑战成功：已发放金币与对应角色碎片。"));
+        } else {
+            m_homePage->setActionMessage(QStringLiteral("挑战失败：本局不会发放金币和碎片。"));
         }
 
         m_state.lastRoundSummary = buildRoundSummary(result);
         syncStateToViews();
+
+        ResultDialog dialog(result, this);
+        dialog.exec();
         switchScene(SceneKey::Home);
     });
 }
@@ -149,6 +157,7 @@ void MainWindow::switchScene(SceneKey scene)
 void MainWindow::resetForNewGame()
 {
     m_state = AppState{};
+    m_homePage->setActionMessage(QStringLiteral("已重置为新游戏：金币恢复 10，碎片、食物和好感度清零。"));
     syncStateToViews();
 }
 
@@ -157,10 +166,11 @@ QString MainWindow::buildRoundSummary(const Match3RoundResult &result) const
     const QString difficultyText = difficultyLabel(result.difficulty);
     if (result.clearedTarget) {
         return QStringLiteral(
-                   "最近一局：%1挑战成功，基础分 %2，步数奖励 %3，最终总分 %4，金币 +%5。")
+                   "最近一局：%1挑战成功，基础分 %2，步数奖励 %3，特殊加分 %4，最终总分 %5，金币 +%6。")
             .arg(difficultyText)
             .arg(result.baseScore)
             .arg(result.moveBonusScore)
+            .arg(result.specialBonusScore)
             .arg(result.finalScore)
             .arg(result.coinReward);
     }
@@ -198,6 +208,7 @@ void MainWindow::buyFood(FoodKind kind)
 {
     const int price = foodPrice(kind);
     if (m_state.coins < price) {
+        m_homePage->setActionMessage(QStringLiteral("金币不足，无法购买%1。").arg(foodName(kind)));
         return;
     }
 
@@ -208,6 +219,8 @@ void MainWindow::buyFood(FoodKind kind)
             break;
         }
     }
+
+    m_homePage->setActionMessage(QStringLiteral("已购买%1，消耗 %2 金币。").arg(foodName(kind)).arg(price));
     syncStateToViews();
 }
 
@@ -222,6 +235,7 @@ void MainWindow::feedCharacter(CharacterKind kind, FoodKind food)
     }
 
     if (!targetFood || targetFood->count <= 0) {
+        m_homePage->setActionMessage(QStringLiteral("%1库存不足。").arg(foodName(food)));
         return;
     }
 
@@ -230,8 +244,14 @@ void MainWindow::feedCharacter(CharacterKind kind, FoodKind food)
             continue;
         }
 
-        progress.affection += affectionGain(kind, food);
+        const int gain = affectionGain(kind, food);
+        progress.affection += gain;
         targetFood->count -= 1;
+        m_homePage->setActionMessage(
+            QStringLiteral("%1吃下了%2，好感度 +%3。")
+                .arg(characterName(kind))
+                .arg(foodName(food))
+                .arg(gain));
         break;
     }
 
@@ -245,7 +265,19 @@ void MainWindow::breakthroughCharacter(CharacterKind kind)
             continue;
         }
 
-        progress.brokenThrough = true;
+        const int choice = QMessageBox::question(
+            this,
+            QStringLiteral("确认突破"),
+            QStringLiteral("%1 的好感度已达到 20，是否现在突破？").arg(characterName(kind)),
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::Yes);
+
+        if (choice == QMessageBox::Yes) {
+            progress.brokenThrough = true;
+            m_homePage->setActionMessage(QStringLiteral("%1 已完成突破。").arg(characterName(kind)));
+        } else {
+            m_homePage->setActionMessage(QStringLiteral("已取消 %1 的突破操作。").arg(characterName(kind)));
+        }
         break;
     }
 

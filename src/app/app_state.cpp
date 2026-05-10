@@ -97,6 +97,34 @@ QString characterSymbol(CharacterKind kind)
     return QStringLiteral("?");
 }
 
+QString characterImagePath(CharacterKind kind, bool brokenThrough)
+{
+    const QString prefix = brokenThrough
+        ? QStringLiteral(":/images/characters/breakthrough/")
+        : QStringLiteral(":/images/characters/");
+
+    switch (kind) {
+    case CharacterKind::WhiteBear:
+        return prefix + QStringLiteral("white-bear.png");
+    case CharacterKind::Mole:
+        return prefix + QStringLiteral("mole.png");
+    case CharacterKind::WaterDragon:
+        return prefix + QStringLiteral("water-dragon.png");
+    case CharacterKind::Penguin:
+        return prefix + QStringLiteral("penguin.png");
+    case CharacterKind::Ghost:
+        return prefix + QStringLiteral("ghost.png");
+    case CharacterKind::Cat:
+        return prefix + QStringLiteral("cat.png");
+    case CharacterKind::QuestionPenguin:
+        return prefix + QStringLiteral("question-penguin.png");
+    case CharacterKind::FriedShrimpTail:
+        return prefix + QStringLiteral("fried-shrimp-tail.png");
+    }
+
+    return prefix + QStringLiteral("white-bear.png");
+}
+
 QString characterDescription(CharacterKind kind)
 {
     switch (kind) {
@@ -162,6 +190,20 @@ QString foodName(FoodKind kind)
     }
 
     return QStringLiteral("未知食物");
+}
+
+QString foodImagePath(FoodKind kind)
+{
+    switch (kind) {
+    case FoodKind::Pudding:
+        return QStringLiteral(":/images/foods/pudding.png");
+    case FoodKind::Soda:
+        return QStringLiteral(":/images/foods/soda.png");
+    case FoodKind::Popsicle:
+        return QStringLiteral(":/images/foods/popsicle.png");
+    }
+
+    return QStringLiteral(":/images/foods/pudding.png");
 }
 
 int foodPrice(FoodKind kind)

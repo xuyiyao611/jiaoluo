@@ -19,6 +19,7 @@ public:
     void setLastRoundSummary(const QString &summary);
     void setCharacterProgress(const QVector<CharacterProgress> &characters);
     void setFoodInventory(const QVector<FoodInventory> &foods);
+    void setActionMessage(const QString &message);
 
 signals:
     void startRequested();
@@ -35,6 +36,7 @@ private:
 
     QLabel *m_coinLabel;
     QLabel *m_lastRoundLabel;
+    QLabel *m_actionMessageLabel;
     QGridLayout *m_characterGrid;
     QGridLayout *m_shopGrid;
     QVector<CharacterProgress> m_characters;

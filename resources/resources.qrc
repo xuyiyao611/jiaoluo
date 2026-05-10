@@ -2,5 +2,24 @@
     <qresource prefix="/images">
         <file alias="landing-background.jpg">images/landing-background.jpg</file>
         <file alias="page-background.jpg">images/page-background.jpg</file>
+        <file alias="characters/white-bear.png">images/characters/white-bear.png</file>
+        <file alias="characters/mole.png">images/characters/mole.png</file>
+        <file alias="characters/water-dragon.png">images/characters/water-dragon.png</file>
+        <file alias="characters/penguin.png">images/characters/penguin.png</file>
+        <file alias="characters/ghost.png">images/characters/ghost.png</file>
+        <file alias="characters/cat.png">images/characters/cat.png</file>
+        <file alias="characters/question-penguin.png">images/characters/question-penguin.png</file>
+        <file alias="characters/fried-shrimp-tail.png">images/characters/fried-shrimp-tail.png</file>
+        <file alias="characters/breakthrough/white-bear.png">images/characters/breakthrough/white-bear.png</file>
+        <file alias="characters/breakthrough/mole.png">images/characters/breakthrough/mole.png</file>
+        <file alias="characters/breakthrough/water-dragon.png">images/characters/breakthrough/water-dragon.png</file>
+        <file alias="characters/breakthrough/penguin.png">images/characters/breakthrough/penguin.png</file>
+        <file alias="characters/breakthrough/ghost.png">images/characters/breakthrough/ghost.png</file>
+        <file alias="characters/breakthrough/cat.png">images/characters/breakthrough/cat.png</file>
+        <file alias="characters/breakthrough/question-penguin.png">images/characters/breakthrough/question-penguin.png</file>
+        <file alias="characters/breakthrough/fried-shrimp-tail.png">images/characters/breakthrough/fried-shrimp-tail.png</file>
+        <file alias="foods/pudding.png">images/pudding.png</file>
+        <file alias="foods/soda.png">images/soda.png</file>
+        <file alias="foods/popsicle.png">images/popsicle.png</file>
     </qresource>
 </RCC>

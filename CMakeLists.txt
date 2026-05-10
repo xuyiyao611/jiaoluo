@@ -28,6 +28,8 @@ qt_add_executable(CornerMatchQt
     src/ui/landing_page.cpp
     src/ui/home_page.h
     src/ui/home_page.cpp
+    src/ui/result_dialog.h
+    src/ui/result_dialog.cpp
     resources/resources.qrc
 )
 
