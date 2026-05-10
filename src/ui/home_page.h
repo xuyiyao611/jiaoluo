@@ -18,16 +18,25 @@ public:
     void setCoins(int coins);
     void setLastRoundSummary(const QString &summary);
     void setCharacterProgress(const QVector<CharacterProgress> &characters);
+    void setFoodInventory(const QVector<FoodInventory> &foods);
 
 signals:
     void startRequested();
     void newGameRequested();
+    void buyFoodRequested(FoodKind kind);
+    void feedCharacterRequested(CharacterKind kind, FoodKind food);
+    void breakthroughRequested(CharacterKind kind);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
+    int foodCount(FoodKind kind) const;
+
     QLabel *m_coinLabel;
     QLabel *m_lastRoundLabel;
     QGridLayout *m_characterGrid;
+    QGridLayout *m_shopGrid;
+    QVector<CharacterProgress> m_characters;
+    QVector<FoodInventory> m_foods;
 };

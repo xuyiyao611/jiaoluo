@@ -11,6 +11,7 @@ namespace {
 
 constexpr int kFragmentsPerCharacter = 200;
 constexpr int kFragmentsPerBonusCoin = 20;
+constexpr int kBreakthroughAffection = 20;
 
 } // namespace
 
@@ -62,6 +63,18 @@ void MainWindow::bindSignals()
         switchScene(SceneKey::Landing);
     });
 
+    connect(m_homePage, &HomePage::buyFoodRequested, this, [this](FoodKind kind) {
+        buyFood(kind);
+    });
+
+    connect(m_homePage, &HomePage::feedCharacterRequested, this, [this](CharacterKind kind, FoodKind food) {
+        feedCharacter(kind, food);
+    });
+
+    connect(m_homePage, &HomePage::breakthroughRequested, this, [this](CharacterKind kind) {
+        breakthroughCharacter(kind);
+    });
+
     connect(m_difficultySelectPage, &DifficultySelectPage::backRequested, this, [this]() {
         switchScene(SceneKey::Home);
     });
@@ -107,6 +120,7 @@ void MainWindow::syncStateToViews()
     m_homePage->setCoins(m_state.coins);
     m_homePage->setLastRoundSummary(m_state.lastRoundSummary);
     m_homePage->setCharacterProgress(m_state.characters);
+    m_homePage->setFoodInventory(m_state.foods);
     m_difficultySelectPage->setSelectedDifficulty(m_state.selectedDifficulty);
     m_gamePage->setCoins(m_state.coins);
     m_gamePage->setDifficulty(m_state.selectedDifficulty);
@@ -135,7 +149,6 @@ void MainWindow::switchScene(SceneKey scene)
 void MainWindow::resetForNewGame()
 {
     m_state = AppState{};
-    m_state.characters = createInitialCharacterProgress();
     syncStateToViews();
 }
 
@@ -179,4 +192,62 @@ void MainWindow::applyFragmentRewards(const Match3RoundResult &result)
             break;
         }
     }
+}
+
+void MainWindow::buyFood(FoodKind kind)
+{
+    const int price = foodPrice(kind);
+    if (m_state.coins < price) {
+        return;
+    }
+
+    m_state.coins -= price;
+    for (FoodInventory &food : m_state.foods) {
+        if (food.kind == kind) {
+            food.count += 1;
+            break;
+        }
+    }
+    syncStateToViews();
+}
+
+void MainWindow::feedCharacter(CharacterKind kind, FoodKind food)
+{
+    FoodInventory *targetFood = nullptr;
+    for (FoodInventory &entry : m_state.foods) {
+        if (entry.kind == food) {
+            targetFood = &entry;
+            break;
+        }
+    }
+
+    if (!targetFood || targetFood->count <= 0) {
+        return;
+    }
+
+    for (CharacterProgress &progress : m_state.characters) {
+        if (progress.kind != kind || !progress.unlocked) {
+            continue;
+        }
+
+        progress.affection += affectionGain(kind, food);
+        targetFood->count -= 1;
+        break;
+    }
+
+    syncStateToViews();
+}
+
+void MainWindow::breakthroughCharacter(CharacterKind kind)
+{
+    for (CharacterProgress &progress : m_state.characters) {
+        if (progress.kind != kind || !progress.unlocked || progress.brokenThrough || progress.affection < kBreakthroughAffection) {
+            continue;
+        }
+
+        progress.brokenThrough = true;
+        break;
+    }
+
+    syncStateToViews();
 }

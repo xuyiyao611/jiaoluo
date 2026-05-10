@@ -97,6 +97,30 @@ QString characterSymbol(CharacterKind kind)
     return QStringLiteral("?");
 }
 
+QString characterDescription(CharacterKind kind)
+{
+    switch (kind) {
+    case CharacterKind::WhiteBear:
+        return QStringLiteral("白熊喜欢安静和柔软的角落，性格温吞。");
+    case CharacterKind::Mole:
+        return QStringLiteral("鼹鼠平时安安静静，但对新鲜事物很好奇。");
+    case CharacterKind::WaterDragon:
+        return QStringLiteral("水龙外表冷静，其实内心柔软。");
+    case CharacterKind::Penguin:
+        return QStringLiteral("企鹅总带着一点迟疑感，表情很有辨识度。");
+    case CharacterKind::Ghost:
+        return QStringLiteral("幽灵存在感很轻，但轮廓独特。");
+    case CharacterKind::Cat:
+        return QStringLiteral("猫咪看起来懒洋洋的，很适合慢慢养成。");
+    case CharacterKind::QuestionPenguin:
+        return QStringLiteral("企鹅？有很强的反差感，是后期重点角色。");
+    case CharacterKind::FriedShrimpTail:
+        return QStringLiteral("炸虾尾辨识度很强，适合做稀有感角色。");
+    }
+
+    return QStringLiteral("未知角色");
+}
+
 QStringList characterNames(const QVector<CharacterKind> &kinds)
 {
     QStringList names;
@@ -105,6 +129,63 @@ QStringList characterNames(const QVector<CharacterKind> &kinds)
         names.push_back(characterName(kind));
     }
     return names;
+}
+
+FoodKind favoriteFoodForCharacter(CharacterKind kind)
+{
+    switch (kind) {
+    case CharacterKind::WhiteBear:
+    case CharacterKind::Penguin:
+    case CharacterKind::QuestionPenguin:
+        return FoodKind::Popsicle;
+    case CharacterKind::Mole:
+    case CharacterKind::WaterDragon:
+    case CharacterKind::FriedShrimpTail:
+        return FoodKind::Soda;
+    case CharacterKind::Ghost:
+    case CharacterKind::Cat:
+        return FoodKind::Pudding;
+    }
+
+    return FoodKind::Pudding;
+}
+
+QString foodName(FoodKind kind)
+{
+    switch (kind) {
+    case FoodKind::Pudding:
+        return QStringLiteral("布丁");
+    case FoodKind::Soda:
+        return QStringLiteral("汽水");
+    case FoodKind::Popsicle:
+        return QStringLiteral("冰棍");
+    }
+
+    return QStringLiteral("未知食物");
+}
+
+int foodPrice(FoodKind kind)
+{
+    switch (kind) {
+    case FoodKind::Pudding:
+        return 20;
+    case FoodKind::Soda:
+        return 30;
+    case FoodKind::Popsicle:
+        return 40;
+    }
+
+    return 0;
+}
+
+QVector<FoodKind> allFoodKinds()
+{
+    return {FoodKind::Pudding, FoodKind::Soda, FoodKind::Popsicle};
+}
+
+int affectionGain(CharacterKind kind, FoodKind food)
+{
+    return favoriteFoodForCharacter(kind) == food ? 3 : 1;
 }
 
 QVector<CharacterProgress> createInitialCharacterProgress()
@@ -126,10 +207,19 @@ QVector<CharacterProgress> createInitialCharacterProgress()
     for (const CharacterKind kind : allKinds) {
         CharacterProgress entry;
         entry.kind = kind;
-        entry.fragments = 0;
-        entry.unlocked = false;
         progress.push_back(entry);
     }
 
     return progress;
+}
+
+QVector<FoodInventory> createInitialFoodInventory()
+{
+    QVector<FoodInventory> inventory;
+    for (const FoodKind kind : allFoodKinds()) {
+        FoodInventory entry;
+        entry.kind = kind;
+        inventory.push_back(entry);
+    }
+    return inventory;
 }

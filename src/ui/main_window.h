@@ -26,6 +26,9 @@ private:
     void resetForNewGame();
     QString buildRoundSummary(const Match3RoundResult &result) const;
     void applyFragmentRewards(const Match3RoundResult &result);
+    void buyFood(FoodKind kind);
+    void feedCharacter(CharacterKind kind, FoodKind food);
+    void breakthroughCharacter(CharacterKind kind);
 
     AppState m_state;
     QStackedWidget *m_stack;

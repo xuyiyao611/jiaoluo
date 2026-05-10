@@ -14,7 +14,8 @@ HomePage::HomePage(QWidget *parent)
     : QWidget(parent),
       m_coinLabel(new QLabel(this)),
       m_lastRoundLabel(new QLabel(this)),
-      m_characterGrid(new QGridLayout())
+      m_characterGrid(new QGridLayout()),
+      m_shopGrid(new QGridLayout())
 {
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(36, 28, 36, 28);
@@ -39,7 +40,7 @@ HomePage::HomePage(QWidget *parent)
     subtitleLabel->setObjectName(QStringLiteral("homeSubtitle"));
 
     auto *descLabel = new QLabel(
-        QStringLiteral("挑战成功后会把本局消除数量转成对应角色碎片。累计到 200 碎片即可视为兑换角色，超出的碎片每 20 个自动转成 1 金币。"),
+        QStringLiteral("挑战成功后收集角色碎片，再用金币购买食物，喂给喜欢的角色，累积好感度并完成突破。"),
         leftCard);
     descLabel->setWordWrap(true);
     descLabel->setObjectName(QStringLiteral("homeDesc"));
@@ -79,69 +80,54 @@ HomePage::HomePage(QWidget *parent)
     m_lastRoundLabel->setWordWrap(true);
     setLastRoundSummary(QStringLiteral("最近一局：还没有结算记录，先开始一局吧。"));
 
-    auto *infoLabel = new QLabel(QStringLiteral("Qt 迁移阶段：已接通主页、难度选择、三消结算、碎片累计与角色兑换展示。"), rightCard);
+    auto *infoLabel = new QLabel(
+        QStringLiteral("Qt 迁移阶段：已接通三消、结算、碎片、角色收集、商店、喂食和突破主流程。"),
+        rightCard);
     infoLabel->setWordWrap(true);
     infoLabel->setObjectName(QStringLiteral("statusHeadline"));
-
-    auto *collectionTitle = new QLabel(QStringLiteral("角色收集"), rightCard);
-    collectionTitle->setObjectName(QStringLiteral("sectionTitle"));
-
-    m_characterGrid->setHorizontalSpacing(12);
-    m_characterGrid->setVerticalSpacing(12);
 
     rightLayout->addWidget(m_coinLabel, 0, Qt::AlignLeft);
     rightLayout->addWidget(infoLabel);
     rightLayout->addWidget(m_lastRoundLabel);
-    rightLayout->addWidget(collectionTitle);
-    rightLayout->addLayout(m_characterGrid);
     rightLayout->addStretch();
 
     heroLayout->addWidget(leftCard, 3);
     heroLayout->addWidget(rightCard, 2);
     rootLayout->addLayout(heroLayout);
 
-    auto *featureGrid = new QGridLayout();
-    featureGrid->setHorizontalSpacing(16);
-    featureGrid->setVerticalSpacing(16);
+    auto *shopCard = new QFrame(this);
+    shopCard->setObjectName(QStringLiteral("featureCard"));
+    auto *shopLayout = new QVBoxLayout(shopCard);
+    shopLayout->setContentsMargins(20, 18, 20, 18);
+    shopLayout->setSpacing(10);
+    auto *shopTitle = new QLabel(QStringLiteral("暖心商店"), shopCard);
+    shopTitle->setObjectName(QStringLiteral("featureTitle"));
+    m_shopGrid->setHorizontalSpacing(14);
+    m_shopGrid->setVerticalSpacing(14);
+    shopLayout->addWidget(shopTitle);
+    shopLayout->addLayout(m_shopGrid);
 
-    const QStringList titles = {
-        QStringLiteral("当前已完成"),
-        QStringLiteral("奖励规则"),
-        QStringLiteral("下一步迁移")
-    };
-    const QStringList descriptions = {
-        QStringLiteral("9 x 9 棋盘、6 元素池、真实交换、三连消除、补位、局内结算。"),
-        QStringLiteral("只有挑战成功后才发金币和碎片；每消除 1 个元素就获得 1 个对应碎片。"),
-        QStringLiteral("后续继续迁移商店、喂食、好感度、突破与角色插图。")
-    };
+    auto *characterCard = new QFrame(this);
+    characterCard->setObjectName(QStringLiteral("featureCard"));
+    auto *characterLayout = new QVBoxLayout(characterCard);
+    characterLayout->setContentsMargins(20, 18, 20, 18);
+    characterLayout->setSpacing(10);
+    auto *characterTitle = new QLabel(QStringLiteral("角色图鉴"), characterCard);
+    characterTitle->setObjectName(QStringLiteral("featureTitle"));
+    m_characterGrid->setHorizontalSpacing(12);
+    m_characterGrid->setVerticalSpacing(12);
+    characterLayout->addWidget(characterTitle);
+    characterLayout->addLayout(m_characterGrid);
 
-    for (int index = 0; index < titles.size(); ++index) {
-        auto *card = new QFrame(this);
-        card->setObjectName(QStringLiteral("featureCard"));
-        auto *cardLayout = new QVBoxLayout(card);
-        cardLayout->setContentsMargins(20, 18, 20, 18);
-        cardLayout->setSpacing(8);
-
-        auto *title = new QLabel(titles.at(index), card);
-        title->setObjectName(QStringLiteral("featureTitle"));
-
-        auto *desc = new QLabel(descriptions.at(index), card);
-        desc->setObjectName(QStringLiteral("featureDesc"));
-        desc->setWordWrap(true);
-
-        cardLayout->addWidget(title);
-        cardLayout->addWidget(desc);
-        featureGrid->addWidget(card, 0, index);
-    }
-
-    rootLayout->addLayout(featureGrid);
+    rootLayout->addWidget(shopCard);
+    rootLayout->addWidget(characterCard);
     rootLayout->addStretch();
 
     connect(startButton, &QPushButton::clicked, this, &HomePage::startRequested);
     connect(newGameButton, &QPushButton::clicked, this, &HomePage::newGameRequested);
 
     setStyleSheet(QStringLiteral(
-        "#homeHeroCard, #homeStatusCard {"
+        "#homeHeroCard, #homeStatusCard, #featureCard, #shopCard, #characterCard {"
         "  background: rgba(255, 251, 246, 225);"
         "  border: 1px solid rgba(190, 174, 161, 110);"
         "  border-radius: 28px;"
@@ -162,30 +148,26 @@ HomePage::HomePage(QWidget *parent)
         "  font-size: 28px;"
         "  font-weight: 700;"
         "}"
-        "#homeDesc, #featureDesc, #statusHeadline {"
+        "#homeDesc, #statusHeadline, #characterMeta, #foodMeta {"
         "  color: #887a73;"
         "  font-size: 15px;"
         "  line-height: 1.6;"
         "}"
-        "#primaryButton {"
-        "  min-height: 48px;"
-        "  padding: 10px 22px;"
+        "#primaryButton, #secondaryButton, #ghostButton {"
+        "  min-height: 44px;"
+        "  padding: 10px 18px;"
         "  border: none;"
-        "  border-radius: 20px;"
-        "  background: #edab84;"
-        "  color: white;"
-        "  font-size: 16px;"
+        "  border-radius: 18px;"
+        "  font-size: 15px;"
         "  font-weight: 700;"
         "}"
-        "#secondaryButton {"
-        "  min-height: 48px;"
-        "  padding: 10px 22px;"
-        "  border: none;"
-        "  border-radius: 20px;"
+        "#primaryButton {"
+        "  background: #edab84;"
+        "  color: white;"
+        "}"
+        "#secondaryButton, #ghostButton {"
         "  background: #f5eadf;"
         "  color: #6d6862;"
-        "  font-size: 16px;"
-        "  font-weight: 700;"
         "}"
         "#coinPill {"
         "  padding: 8px 16px;"
@@ -195,7 +177,7 @@ HomePage::HomePage(QWidget *parent)
         "  font-size: 16px;"
         "  font-weight: 800;"
         "}"
-        "#statusHeadline, #sectionTitle {"
+        "#statusHeadline, #featureTitle {"
         "  color: #716662;"
         "  font-size: 17px;"
         "  font-weight: 700;"
@@ -208,33 +190,22 @@ HomePage::HomePage(QWidget *parent)
         "  font-size: 14px;"
         "  font-weight: 600;"
         "}"
-        "#statusItemCard, #featureCard, #characterCard {"
+        "#itemCard {"
         "  background: rgba(255, 255, 255, 208);"
         "  border: 1px solid rgba(195, 181, 169, 95);"
         "  border-radius: 22px;"
         "}"
-        "#featureTitle, #characterName {"
+        "#itemTitle {"
         "  color: #716662;"
         "  font-size: 18px;"
         "  font-weight: 700;"
         "}"
-        "#characterSymbol {"
+        "#itemSymbol {"
         "  color: #8b7264;"
         "  font-size: 22px;"
         "  font-weight: 800;"
         "}"
-        "#characterMeta {"
-        "  color: #887a73;"
-        "  font-size: 13px;"
-        "}"
-        "#characterLock {"
-        "  color: #b89f92;"
-        "  font-size: 13px;"
-        "  font-weight: 700;"
-        "}"
     ));
-
-    setCharacterProgress(createInitialCharacterProgress());
 }
 
 void HomePage::setCoins(int coins)
@@ -249,6 +220,8 @@ void HomePage::setLastRoundSummary(const QString &summary)
 
 void HomePage::setCharacterProgress(const QVector<CharacterProgress> &characters)
 {
+    m_characters = characters;
+
     while (QLayoutItem *item = m_characterGrid->takeAt(0)) {
         if (item->widget()) {
             item->widget()->deleteLater();
@@ -256,38 +229,139 @@ void HomePage::setCharacterProgress(const QVector<CharacterProgress> &characters
         delete item;
     }
 
-    for (int index = 0; index < characters.size(); ++index) {
-        const CharacterProgress &progress = characters.at(index);
+    for (int index = 0; index < m_characters.size(); ++index) {
+        const CharacterProgress &progress = m_characters.at(index);
 
         auto *card = new QFrame(this);
-        card->setObjectName(QStringLiteral("characterCard"));
+        card->setObjectName(QStringLiteral("itemCard"));
         auto *cardLayout = new QVBoxLayout(card);
         cardLayout->setContentsMargins(14, 14, 14, 14);
         cardLayout->setSpacing(6);
 
         auto *symbolLabel = new QLabel(characterSymbol(progress.kind), card);
-        symbolLabel->setObjectName(QStringLiteral("characterSymbol"));
+        symbolLabel->setObjectName(QStringLiteral("itemSymbol"));
 
         auto *nameLabel = new QLabel(characterName(progress.kind), card);
-        nameLabel->setObjectName(QStringLiteral("characterName"));
+        nameLabel->setObjectName(QStringLiteral("itemTitle"));
 
-        auto *fragmentLabel = new QLabel(
-            QStringLiteral("碎片：%1 / 200").arg(progress.fragments),
-            card);
+        auto *fragmentLabel = new QLabel(QStringLiteral("碎片：%1 / 200").arg(progress.fragments), card);
         fragmentLabel->setObjectName(QStringLiteral("characterMeta"));
 
-        auto *statusLabel = new QLabel(
-            progress.unlocked ? QStringLiteral("已兑换") : QStringLiteral("未兑换"),
+        auto *affectionLabel = new QLabel(
+            progress.affection >= 20
+                ? QStringLiteral("好感度已满")
+                : QStringLiteral("好感度：%1 / 20").arg(progress.affection),
             card);
-        statusLabel->setObjectName(progress.unlocked ? QStringLiteral("characterMeta") : QStringLiteral("characterLock"));
+        affectionLabel->setObjectName(QStringLiteral("characterMeta"));
+
+        auto *favoriteLabel = new QLabel(
+            QStringLiteral("偏好食物：%1").arg(foodName(favoriteFoodForCharacter(progress.kind))),
+            card);
+        favoriteLabel->setObjectName(QStringLiteral("characterMeta"));
+
+        auto *descLabel = new QLabel(characterDescription(progress.kind), card);
+        descLabel->setWordWrap(true);
+        descLabel->setObjectName(QStringLiteral("characterMeta"));
 
         cardLayout->addWidget(symbolLabel);
         cardLayout->addWidget(nameLabel);
         cardLayout->addWidget(fragmentLabel);
-        cardLayout->addWidget(statusLabel);
+        cardLayout->addWidget(affectionLabel);
+        cardLayout->addWidget(favoriteLabel);
+        cardLayout->addWidget(descLabel);
+
+        if (progress.unlocked) {
+            for (const FoodKind food : allFoodKinds()) {
+                auto *feedButton = new QPushButton(
+                    QStringLiteral("喂%1 (%2)").arg(foodName(food)).arg(foodCount(food)),
+                    card);
+                feedButton->setObjectName(QStringLiteral("ghostButton"));
+                feedButton->setEnabled(foodCount(food) > 0);
+                connect(feedButton, &QPushButton::clicked, this, [this, progress, food]() {
+                    emit feedCharacterRequested(progress.kind, food);
+                });
+                cardLayout->addWidget(feedButton);
+            }
+
+            if (!progress.brokenThrough && progress.affection >= 20) {
+                auto *breakthroughButton = new QPushButton(QStringLiteral("突破"), card);
+                breakthroughButton->setObjectName(QStringLiteral("primaryButton"));
+                connect(breakthroughButton, &QPushButton::clicked, this, [this, progress]() {
+                    emit breakthroughRequested(progress.kind);
+                });
+                cardLayout->addWidget(breakthroughButton);
+            } else if (progress.brokenThrough) {
+                auto *statusLabel = new QLabel(QStringLiteral("状态：已突破"), card);
+                statusLabel->setObjectName(QStringLiteral("characterMeta"));
+                cardLayout->addWidget(statusLabel);
+            }
+        } else {
+            auto *lockLabel = new QLabel(QStringLiteral("状态：未兑换"), card);
+            lockLabel->setObjectName(QStringLiteral("characterMeta"));
+            cardLayout->addWidget(lockLabel);
+        }
 
         m_characterGrid->addWidget(card, index / 4, index % 4);
     }
+}
+
+void HomePage::setFoodInventory(const QVector<FoodInventory> &foods)
+{
+    m_foods = foods;
+
+    while (QLayoutItem *item = m_shopGrid->takeAt(0)) {
+        if (item->widget()) {
+            item->widget()->deleteLater();
+        }
+        delete item;
+    }
+
+    const QVector<FoodKind> kinds = allFoodKinds();
+    for (int index = 0; index < kinds.size(); ++index) {
+        const FoodKind kind = kinds.at(index);
+
+        auto *card = new QFrame(this);
+        card->setObjectName(QStringLiteral("itemCard"));
+        auto *cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(14, 14, 14, 14);
+        cardLayout->setSpacing(6);
+
+        auto *symbolLabel = new QLabel(foodName(kind).left(1), card);
+        symbolLabel->setObjectName(QStringLiteral("itemSymbol"));
+
+        auto *nameLabel = new QLabel(foodName(kind), card);
+        nameLabel->setObjectName(QStringLiteral("itemTitle"));
+
+        auto *priceLabel = new QLabel(QStringLiteral("价格：%1 金币").arg(foodPrice(kind)), card);
+        priceLabel->setObjectName(QStringLiteral("foodMeta"));
+
+        auto *countLabel = new QLabel(QStringLiteral("库存：%1").arg(foodCount(kind)), card);
+        countLabel->setObjectName(QStringLiteral("foodMeta"));
+
+        auto *buyButton = new QPushButton(QStringLiteral("购买"), card);
+        buyButton->setObjectName(QStringLiteral("secondaryButton"));
+        connect(buyButton, &QPushButton::clicked, this, [this, kind]() {
+            emit buyFoodRequested(kind);
+        });
+
+        cardLayout->addWidget(symbolLabel);
+        cardLayout->addWidget(nameLabel);
+        cardLayout->addWidget(priceLabel);
+        cardLayout->addWidget(countLabel);
+        cardLayout->addWidget(buyButton);
+
+        m_shopGrid->addWidget(card, 0, index);
+    }
+}
+
+int HomePage::foodCount(FoodKind kind) const
+{
+    for (const FoodInventory &food : m_foods) {
+        if (food.kind == kind) {
+            return food.count;
+        }
+    }
+    return 0;
 }
 
 void HomePage::paintEvent(QPaintEvent *event)
