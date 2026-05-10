@@ -8,11 +8,13 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QPushButton>
+#include <QStringList>
 #include <QVBoxLayout>
 
 HomePage::HomePage(QWidget *parent)
     : QWidget(parent),
-      m_coinLabel(new QLabel(this))
+      m_coinLabel(new QLabel(this)),
+      m_lastRoundLabel(new QLabel(this))
 {
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(36, 28, 36, 28);
@@ -37,7 +39,7 @@ HomePage::HomePage(QWidget *parent)
     subtitleLabel->setObjectName(QStringLiteral("homeSubtitle"));
 
     auto *descLabel = new QLabel(
-        QStringLiteral("挑战成功后领取金币与碎片奖励，喂喜欢的零食、累积好感度，再逐步迁移完整玩法到 Qt / C++ 版本。"),
+        QStringLiteral("挑战成功后领取金币奖励，后续会继续把碎片、角色、商店和喂食系统完整迁移到 Qt / C++ 版本。"),
         leftCard);
     descLabel->setWordWrap(true);
     descLabel->setObjectName(QStringLiteral("homeDesc"));
@@ -73,7 +75,11 @@ HomePage::HomePage(QWidget *parent)
     m_coinLabel->setObjectName(QStringLiteral("coinPill"));
     setCoins(10);
 
-    auto *infoLabel = new QLabel(QStringLiteral("Qt 迁移第二步：主页、难度页和基础状态流转"), rightCard);
+    m_lastRoundLabel->setObjectName(QStringLiteral("lastRoundLabel"));
+    m_lastRoundLabel->setWordWrap(true);
+    setLastRoundSummary(QStringLiteral("最近一局：还没有结算记录，先开始一局吧。"));
+
+    auto *infoLabel = new QLabel(QStringLiteral("Qt 迁移阶段：主页、难度选择和首个可玩三消棋盘已经接通。"), rightCard);
     infoLabel->setWordWrap(true);
     infoLabel->setObjectName(QStringLiteral("statusHeadline"));
 
@@ -84,8 +90,8 @@ HomePage::HomePage(QWidget *parent)
     const QStringList items = {
         QStringLiteral("启动页已迁移"),
         QStringLiteral("主页已迁移"),
-        QStringLiteral("难度页待进入"),
-        QStringLiteral("三消玩法待迁移")
+        QStringLiteral("难度页已接通"),
+        QStringLiteral("三消玩法首版可玩")
     };
 
     for (int index = 0; index < items.size(); ++index) {
@@ -110,6 +116,7 @@ HomePage::HomePage(QWidget *parent)
 
     rightLayout->addWidget(m_coinLabel, 0, Qt::AlignLeft);
     rightLayout->addWidget(infoLabel);
+    rightLayout->addWidget(m_lastRoundLabel);
     rightLayout->addLayout(grid);
     rightLayout->addStretch();
 
@@ -123,13 +130,13 @@ HomePage::HomePage(QWidget *parent)
 
     const QStringList titles = {
         QStringLiteral("安静的小棋盘"),
-        QStringLiteral("赢了才有礼物"),
-        QStringLiteral("喂食与突破")
+        QStringLiteral("赢了才有奖励"),
+        QStringLiteral("后续继续迁移")
     };
     const QStringList descriptions = {
-        QStringLiteral("9 x 9 棋盘配合 6 类元素，后续会在 Qt 版逐步恢复完整三消体验。"),
-        QStringLiteral("只有挑战成功后才会结算金币和碎片奖励，保留原项目的核心规则。"),
-        QStringLiteral("角色碎片、商店、好感度与突破系统会在后续阶段按模块迁移。")
+        QStringLiteral("9 x 9 棋盘配合 6 类元素，当前已支持真实交换、三连消除与自动补位。"),
+        QStringLiteral("只有挑战成功后才会发放金币奖励，保持和原项目一致的核心规则。"),
+        QStringLiteral("碎片、角色兑换、商店、喂食、好感度与突破系统会在后续阶段继续迁到 Qt。")
     };
 
     for (int index = 0; index < titles.size(); ++index) {
@@ -217,6 +224,14 @@ HomePage::HomePage(QWidget *parent)
         "  font-size: 17px;"
         "  font-weight: 700;"
         "}"
+        "#lastRoundLabel {"
+        "  padding: 12px 14px;"
+        "  border-radius: 18px;"
+        "  background: rgba(255, 243, 226, 210);"
+        "  color: #7a665c;"
+        "  font-size: 14px;"
+        "  font-weight: 600;"
+        "}"
         "#statusItemCard, #featureCard {"
         "  background: rgba(255, 255, 255, 208);"
         "  border: 1px solid rgba(195, 181, 169, 95);"
@@ -241,6 +256,11 @@ HomePage::HomePage(QWidget *parent)
 void HomePage::setCoins(int coins)
 {
     m_coinLabel->setText(QStringLiteral("当前金币：%1").arg(coins));
+}
+
+void HomePage::setLastRoundSummary(const QString &summary)
+{
+    m_lastRoundLabel->setText(summary);
 }
 
 void HomePage::paintEvent(QPaintEvent *event)

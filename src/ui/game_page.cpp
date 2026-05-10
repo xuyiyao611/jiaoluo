@@ -5,6 +5,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLinearGradient>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPixmap>
 #include <QPushButton>
@@ -16,7 +17,9 @@
 namespace {
 
 constexpr int kTileKindCount = 6;
-constexpr int kScorePerTile = 100;
+constexpr int kScorePerTile = 20;
+constexpr int kScorePerMoveLeft = 100;
+constexpr int kScoreToCoinDivisor = 100;
 
 } // namespace
 
@@ -31,7 +34,8 @@ GamePage::GamePage(QWidget *parent)
       m_goalLabel(new QLabel(this)),
       m_hintLabel(new QLabel(this)),
       m_boardLayout(new QGridLayout()),
-      m_selectedCell(-1, -1)
+      m_selectedCell(-1, -1),
+      m_roundFinished(false)
 {
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(36, 28, 36, 28);
@@ -169,6 +173,7 @@ void GamePage::startNewRound()
     m_score = 0;
     m_movesLeft = config.moveLimit;
     m_selectedCell = QPoint(-1, -1);
+    m_roundFinished = false;
     m_statusMessage = QStringLiteral("选中一个格子，再点相邻格子交换。横向或纵向三个及以上相同元素会消除。");
 
     rebuildBoardWidgets();
@@ -235,7 +240,6 @@ void GamePage::initializeBoard()
     for (int row = 0; row < config.rows; ++row) {
         for (int col = 0; col < config.cols; ++col) {
             const int index = boardIndex(row, col);
-
             int kind = randomKind();
             m_boardKinds[index] = kind;
 
@@ -311,10 +315,10 @@ void GamePage::updateHeaderText()
     m_goalLabel->setText(QStringLiteral("目标分数：%1").arg(config.targetScore));
 
     QString hint = m_statusMessage;
-    if (m_score >= config.targetScore) {
-        hint += QStringLiteral(" 当前已达到目标分数。");
-    } else if (m_movesLeft == 0) {
-        hint += QStringLiteral(" 步数已用完，请重新开局。");
+    if (m_score >= config.targetScore && !m_roundFinished) {
+        hint += QStringLiteral(" 当前已达到目标分数，再进行一次有效交换就会结算。");
+    } else if (m_movesLeft == 0 && !m_roundFinished) {
+        hint += QStringLiteral(" 步数已用完，本局将按失败结算。");
     }
 
     m_hintLabel->setText(hint);
@@ -378,7 +382,6 @@ bool GamePage::hasMatchAt(int row, int col) const
         }
         ++horizontal;
     }
-
     if (horizontal >= 3) {
         return true;
     }
@@ -396,7 +399,6 @@ bool GamePage::hasMatchAt(int row, int col) const
         }
         ++vertical;
     }
-
     return vertical >= 3;
 }
 
@@ -454,9 +456,14 @@ QVector<QPoint> GamePage::collectMatches() const
 
 void GamePage::handleCellClicked(int row, int col)
 {
-    if (m_movesLeft <= 0) {
-        m_statusMessage = QStringLiteral("本局步数已用完，请点击“重新开局”。");
+    if (m_roundFinished) {
+        m_statusMessage = QStringLiteral("本局已经结算，请重新开局或返回主页。");
         updateHeaderText();
+        return;
+    }
+
+    if (m_movesLeft <= 0) {
+        finishRound(false);
         return;
     }
 
@@ -502,12 +509,21 @@ void GamePage::handleCellClicked(int row, int col)
     --m_movesLeft;
     resolveMatches(matches);
 
-    if (!hasPlayableState()) {
-        m_statusMessage += QStringLiteral(" 当前棋盘无有效交换，系统已为下一局逻辑预留重开。");
+    if (!m_roundFinished && !hasPlayableState()) {
+        m_statusMessage += QStringLiteral(" 当前棋盘无有效交换，建议重新开局。");
     }
 
     updateBoardView();
     updateHeaderText();
+
+    if (!m_roundFinished && m_score >= configForDifficulty(m_difficulty).targetScore) {
+        finishRound(true);
+        return;
+    }
+
+    if (!m_roundFinished && m_movesLeft <= 0) {
+        finishRound(false);
+    }
 }
 
 void GamePage::swapCells(const QPoint &first, const QPoint &second)
@@ -521,8 +537,11 @@ void GamePage::resolveMatches(const QVector<QPoint> &matches)
 {
     QVector<QPoint> currentMatches = matches;
     int chain = 1;
+    int totalCleared = 0;
 
     while (!currentMatches.isEmpty()) {
+        totalCleared += currentMatches.size();
+
         for (const QPoint &point : currentMatches) {
             m_boardKinds[boardIndex(point.x(), point.y())] = -1;
         }
@@ -532,9 +551,9 @@ void GamePage::resolveMatches(const QVector<QPoint> &matches)
 
         const QVector<QPoint> nextMatches = collectMatches();
         if (nextMatches.isEmpty()) {
-            m_statusMessage = QStringLiteral("成功消除了 %1 个元素，获得 %2 分。")
-                                  .arg(currentMatches.size())
-                                  .arg(currentMatches.size() * kScorePerTile * chain);
+            m_statusMessage = QStringLiteral("成功消除了 %1 个元素，当前基础分 %2。")
+                                  .arg(totalCleared)
+                                  .arg(m_score);
             break;
         }
 
@@ -572,6 +591,57 @@ void GamePage::refillBoard()
     }
 }
 
+void GamePage::finishRound(bool clearedTarget)
+{
+    if (m_roundFinished) {
+        return;
+    }
+
+    m_roundFinished = true;
+    m_selectedCell = QPoint(-1, -1);
+
+    const auto config = configForDifficulty(m_difficulty);
+    Match3RoundResult result;
+    result.clearedTarget = clearedTarget;
+    result.baseScore = m_score;
+    result.moveBonusScore = clearedTarget ? m_movesLeft * kScorePerMoveLeft : 0;
+    result.finalScore = result.baseScore + result.moveBonusScore;
+    result.coinReward = clearedTarget ? result.finalScore / kScoreToCoinDivisor : 0;
+    result.movesLeft = m_movesLeft;
+    result.movesUsed = config.moveLimit - m_movesLeft;
+    result.difficulty = m_difficulty;
+
+    if (clearedTarget) {
+        m_statusMessage = QStringLiteral("挑战成功，奖励已结算。");
+    } else {
+        m_statusMessage = QStringLiteral("挑战失败，本局不发放金币奖励。");
+    }
+    updateBoardView();
+    updateHeaderText();
+
+    QString detailText;
+    if (clearedTarget) {
+        detailText = QStringLiteral(
+            "你已完成目标分数。\n\n基础分：%1\n剩余步数加分：%2\n最终总分：%3\n金币奖励：+%4")
+                         .arg(result.baseScore)
+                         .arg(result.moveBonusScore)
+                         .arg(result.finalScore)
+                         .arg(result.coinReward);
+    } else {
+        detailText = QStringLiteral(
+            "步数已经用完，未达到目标分数。\n\n基础分：%1\n目标分数：%2\n本局金币奖励：0")
+                         .arg(result.baseScore)
+                         .arg(config.targetScore);
+    }
+
+    QMessageBox::information(
+        this,
+        clearedTarget ? QStringLiteral("挑战成功") : QStringLiteral("挑战失败"),
+        detailText);
+
+    emit roundFinished(result);
+}
+
 int GamePage::boardIndex(int row, int col) const
 {
     const auto config = configForDifficulty(m_difficulty);
@@ -586,7 +656,7 @@ int GamePage::randomKind() const
 bool GamePage::hasPlayableState() const
 {
     const auto config = configForDifficulty(m_difficulty);
-    QVector<int> backup = m_boardKinds;
+    const QVector<int> backup = m_boardKinds;
 
     for (int row = 0; row < config.rows; ++row) {
         for (int col = 0; col < config.cols; ++col) {

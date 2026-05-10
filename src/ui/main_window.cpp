@@ -73,6 +73,16 @@ void MainWindow::bindSignals()
     connect(m_gamePage, &GamePage::backToHomeRequested, this, [this]() {
         switchScene(SceneKey::Home);
     });
+
+    connect(m_gamePage, &GamePage::roundFinished, this, [this](const Match3RoundResult &result) {
+        if (result.clearedTarget) {
+            m_state.coins += result.coinReward;
+        }
+
+        m_state.lastRoundSummary = buildRoundSummary(result);
+        syncStateToViews();
+        switchScene(SceneKey::Home);
+    });
 }
 
 void MainWindow::applyWindowStyle()
@@ -87,6 +97,7 @@ void MainWindow::applyWindowStyle()
 void MainWindow::syncStateToViews()
 {
     m_homePage->setCoins(m_state.coins);
+    m_homePage->setLastRoundSummary(m_state.lastRoundSummary);
     m_difficultySelectPage->setSelectedDifficulty(m_state.selectedDifficulty);
     m_gamePage->setCoins(m_state.coins);
     m_gamePage->setDifficulty(m_state.selectedDifficulty);
@@ -116,4 +127,22 @@ void MainWindow::resetForNewGame()
 {
     m_state = AppState{};
     syncStateToViews();
+}
+
+QString MainWindow::buildRoundSummary(const Match3RoundResult &result) const
+{
+    const QString difficultyText = result.difficulty == Difficulty::Hard ? QStringLiteral("困难模式") : QStringLiteral("简单模式");
+    if (result.clearedTarget) {
+        return QStringLiteral(
+                   "最近一局：%1挑战成功，基础分 %2，步数奖励 %3，最终总分 %4，金币 +%5。")
+            .arg(difficultyText)
+            .arg(result.baseScore)
+            .arg(result.moveBonusScore)
+            .arg(result.finalScore)
+            .arg(result.coinReward);
+    }
+
+    return QStringLiteral("最近一局：%1挑战失败，基础分 %2，未获得金币奖励。")
+        .arg(difficultyText)
+        .arg(result.baseScore);
 }

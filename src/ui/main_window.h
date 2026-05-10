@@ -3,12 +3,12 @@
 #include <QMainWindow>
 
 #include "app/app_state.h"
+#include "ui/game_page.h"
 
 class QStackedWidget;
 class LandingPage;
 class HomePage;
 class DifficultySelectPage;
-class GamePage;
 
 class MainWindow : public QMainWindow
 {
@@ -24,6 +24,7 @@ private:
     void syncStateToViews();
     void switchScene(SceneKey scene);
     void resetForNewGame();
+    QString buildRoundSummary(const Match3RoundResult &result) const;
 
     AppState m_state;
     QStackedWidget *m_stack;

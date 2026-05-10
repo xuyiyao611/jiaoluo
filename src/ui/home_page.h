@@ -12,6 +12,7 @@ public:
     explicit HomePage(QWidget *parent = nullptr);
 
     void setCoins(int coins);
+    void setLastRoundSummary(const QString &summary);
 
 signals:
     void startRequested();
@@ -22,4 +23,5 @@ protected:
 
 private:
     QLabel *m_coinLabel;
+    QLabel *m_lastRoundLabel;
 };

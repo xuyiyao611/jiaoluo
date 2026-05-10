@@ -10,6 +10,19 @@ class QLabel;
 class QGridLayout;
 class QPushButton;
 
+struct Match3RoundResult {
+    bool clearedTarget = false;
+    int baseScore = 0;
+    int moveBonusScore = 0;
+    int finalScore = 0;
+    int coinReward = 0;
+    int movesUsed = 0;
+    int movesLeft = 0;
+    Difficulty difficulty = Difficulty::Easy;
+};
+
+Q_DECLARE_METATYPE(Match3RoundResult)
+
 class GamePage : public QWidget
 {
     Q_OBJECT
@@ -24,6 +37,7 @@ public:
 signals:
     void backToHomeRequested();
     void backToDifficultyRequested();
+    void roundFinished(const Match3RoundResult &result);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -50,6 +64,7 @@ private:
     void swapCells(const QPoint &first, const QPoint &second);
     void resolveMatches(const QVector<QPoint> &matches);
     void refillBoard();
+    void finishRound(bool clearedTarget);
     int boardIndex(int row, int col) const;
     int randomKind() const;
     bool hasPlayableState() const;
@@ -67,4 +82,5 @@ private:
     QVector<int> m_boardKinds;
     QPoint m_selectedCell;
     QString m_statusMessage;
+    bool m_roundFinished;
 };
