@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Multimedia)
 
 qt_standard_project_setup()
 
@@ -43,6 +43,7 @@ target_link_libraries(CornerMatchQt
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::Multimedia
 )
 
 if (WIN32)

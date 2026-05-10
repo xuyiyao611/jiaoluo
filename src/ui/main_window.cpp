@@ -11,8 +11,6 @@
 
 namespace {
 
-constexpr int kFragmentsPerCharacter = 200;
-constexpr int kFragmentsPerBonusCoin = 20;
 constexpr int kBreakthroughAffection = 20;
 
 } // namespace
@@ -60,8 +58,7 @@ void MainWindow::bindSignals()
         switchScene(SceneKey::DifficultySelect);
     });
 
-    connect(m_homePage, &HomePage::newGameRequested, this, [this]() {
-        resetForNewGame();
+    connect(m_homePage, &HomePage::backRequested, this, [this]() {
         switchScene(SceneKey::Landing);
     });
 
@@ -193,11 +190,11 @@ void MainWindow::applyFragmentRewards(const Match3RoundResult &result)
 
             const int previousFragments = progress.fragments;
             const int nextFragments = previousFragments + gain;
-            const int previousBonusCoins = qMax(previousFragments - kFragmentsPerCharacter, 0) / kFragmentsPerBonusCoin;
-            const int nextBonusCoins = qMax(nextFragments - kFragmentsPerCharacter, 0) / kFragmentsPerBonusCoin;
+            const int previousBonusCoins = qMax(previousFragments - kCharacterUnlockFragments, 0) / kFragmentsPerBonusCoin;
+            const int nextBonusCoins = qMax(nextFragments - kCharacterUnlockFragments, 0) / kFragmentsPerBonusCoin;
 
             progress.fragments = nextFragments;
-            progress.unlocked = progress.unlocked || nextFragments >= kFragmentsPerCharacter;
+            progress.unlocked = progress.unlocked || nextFragments >= kCharacterUnlockFragments;
             m_state.coins += nextBonusCoins - previousBonusCoins;
             break;
         }

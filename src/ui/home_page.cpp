@@ -1,4 +1,4 @@
-#include "home_page.h"
+﻿#include "home_page.h"
 
 #include <QFrame>
 #include <QGridLayout>
@@ -77,16 +77,16 @@ HomePage::HomePage(QWidget *parent)
     auto *buttonRow = new QHBoxLayout();
     buttonRow->setSpacing(14);
 
+    auto *backButton = new QPushButton(QStringLiteral("返回上一页"), leftCard);
+    backButton->setObjectName(QStringLiteral("secondaryButton"));
+    backButton->setCursor(Qt::PointingHandCursor);
+
     auto *startButton = new QPushButton(QStringLiteral("开始游戏"), leftCard);
     startButton->setObjectName(QStringLiteral("primaryButton"));
     startButton->setCursor(Qt::PointingHandCursor);
 
-    auto *newGameButton = new QPushButton(QStringLiteral("开新游戏"), leftCard);
-    newGameButton->setObjectName(QStringLiteral("secondaryButton"));
-    newGameButton->setCursor(Qt::PointingHandCursor);
-
+    buttonRow->addWidget(backButton, 0);
     buttonRow->addWidget(startButton, 0);
-    buttonRow->addWidget(newGameButton, 0);
     buttonRow->addStretch();
 
     leftLayout->addWidget(badgeLabel, 0, Qt::AlignLeft);
@@ -167,8 +167,8 @@ HomePage::HomePage(QWidget *parent)
     contentLayout->addWidget(characterCard);
     contentLayout->addStretch();
 
+    connect(backButton, &QPushButton::clicked, this, &HomePage::backRequested);
     connect(startButton, &QPushButton::clicked, this, &HomePage::startRequested);
-    connect(newGameButton, &QPushButton::clicked, this, &HomePage::newGameRequested);
 
     setStyleSheet(QStringLiteral(
         "QScrollArea {"
@@ -343,7 +343,9 @@ void HomePage::setCharacterProgress(const QVector<CharacterProgress> &characters
         auto *nameLabel = new QLabel(characterName(progress.kind), card);
         nameLabel->setObjectName(QStringLiteral("itemTitle"));
 
-        auto *fragmentLabel = new QLabel(QStringLiteral("碎片：%1 / 200").arg(progress.fragments), card);
+        auto *fragmentLabel = new QLabel(
+            QStringLiteral("碎片：%1 / %2").arg(progress.fragments).arg(kCharacterUnlockFragments),
+            card);
         fragmentLabel->setObjectName(QStringLiteral("characterMeta"));
 
         auto *affectionLabel = new QLabel(

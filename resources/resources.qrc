@@ -22,4 +22,9 @@
         <file alias="foods/soda.png">images/soda.png</file>
         <file alias="foods/popsicle.png">images/popsicle.png</file>
     </qresource>
+    <qresource prefix="/audio">
+        <file alias="bgm.flac">audio/bgm.flac</file>
+        <file alias="match.wav">audio/match.wav</file>
+        <file alias="laser.wav">audio/laser.wav</file>
+    </qresource>
 </RCC>

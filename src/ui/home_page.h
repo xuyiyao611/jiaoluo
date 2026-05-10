@@ -22,8 +22,8 @@ public:
     void setActionMessage(const QString &message);
 
 signals:
+    void backRequested();
     void startRequested();
-    void newGameRequested();
     void buyFoodRequested(FoodKind kind);
     void feedCharacterRequested(CharacterKind kind, FoodKind food);
     void breakthroughRequested(CharacterKind kind);

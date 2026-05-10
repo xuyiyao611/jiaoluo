@@ -1,20 +1,31 @@
-#include "game_page.h"
+﻿#include "game_page.h"
 
+#include <QAudioOutput>
+#include <QEventLoop>
 #include <QFrame>
 #include <QGraphicsDropShadowEffect>
+#include <QGraphicsOpacityEffect>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
 #include <QLinearGradient>
+#include <QMediaPlayer>
 #include <QMessageBox>
 #include <QPainter>
+#include <QParallelAnimationGroup>
 #include <QPixmap>
+#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QRandomGenerator>
 #include <QSet>
 #include <QSizePolicy>
+#include <QSoundEffect>
+#include <QTimer>
+#include <QUrl>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 namespace {
 
@@ -23,10 +34,28 @@ constexpr int kScorePerMoveLeft = 100;
 constexpr int kScoreToCoinDivisor = 100;
 constexpr int kBoardCellSize = 48;
 constexpr int kTileIconSize = 30;
+constexpr int kClearAnimationMs = 180;
+constexpr int kBeamFrameMs = 16;
 
 QString positionKey(const QPoint &point)
 {
     return QStringLiteral("%1:%2").arg(point.x()).arg(point.y());
+}
+
+void runAnimationGroup(QParallelAnimationGroup *group)
+{
+    if (!group || group->animationCount() == 0) {
+        if (group) {
+            group->deleteLater();
+        }
+        return;
+    }
+
+    QEventLoop loop;
+    QObject::connect(group, &QParallelAnimationGroup::finished, &loop, &QEventLoop::quit);
+    group->start();
+    loop.exec();
+    group->deleteLater();
 }
 
 } // namespace
@@ -42,10 +71,17 @@ GamePage::GamePage(QWidget *parent)
       m_goalLabel(new QLabel(this)),
       m_hintLabel(new QLabel(this)),
       m_boardWidget(new QWidget(this)),
+      m_beamOverlay(new QLabel(this)),
       m_boardLayout(new QGridLayout()),
       m_selectedCell(-1, -1),
       m_roundFinished(false),
-      m_specialTilesLeft(0)
+      m_animating(false),
+      m_specialTilesLeft(0),
+      m_bgmPlayer(new QMediaPlayer(this)),
+      m_bgmOutput(new QAudioOutput(this)),
+      m_matchSound(new QSoundEffect(this)),
+      m_laserSound(new QSoundEffect(this)),
+      m_beamTimer(new QTimer(this))
 {
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(20, 14, 20, 16);
@@ -87,6 +123,9 @@ GamePage::GamePage(QWidget *parent)
     m_boardLayout->setContentsMargins(0, 0, 0, 0);
     m_boardWidget->setObjectName(QStringLiteral("boardWidget"));
     m_boardWidget->setLayout(m_boardLayout);
+    m_beamOverlay->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    m_beamOverlay->setStyleSheet(QStringLiteral("background: transparent;"));
+    m_beamOverlay->hide();
 
     auto *boardCenterLayout = new QHBoxLayout();
     boardCenterLayout->setContentsMargins(0, 0, 0, 0);
@@ -102,7 +141,7 @@ GamePage::GamePage(QWidget *parent)
     restartButton->setObjectName(QStringLiteral("accentButton"));
     restartButton->setCursor(Qt::PointingHandCursor);
 
-    auto *backDifficultyButton = new QPushButton(QStringLiteral("返回难度选择"), this);
+    auto *backDifficultyButton = new QPushButton(QStringLiteral("返回上一页"), this);
     backDifficultyButton->setObjectName(QStringLiteral("ghostButton"));
     backDifficultyButton->setCursor(Qt::PointingHandCursor);
 
@@ -123,6 +162,19 @@ GamePage::GamePage(QWidget *parent)
     connect(restartButton, &QPushButton::clicked, this, &GamePage::startNewRound);
     connect(backDifficultyButton, &QPushButton::clicked, this, &GamePage::backToDifficultyRequested);
     connect(backHomeButton, &QPushButton::clicked, this, &GamePage::backToHomeRequested);
+    connect(m_beamTimer, &QTimer::timeout, this, &GamePage::advanceBeamAnimations);
+
+    m_bgmOutput->setVolume(0.25f);
+    m_bgmPlayer->setAudioOutput(m_bgmOutput);
+    m_bgmPlayer->setSource(QUrl(QStringLiteral("qrc:/audio/bgm.flac")));
+    m_bgmPlayer->setLoops(QMediaPlayer::Infinite);
+    m_bgmPlayer->play();
+
+    m_matchSound->setSource(QUrl(QStringLiteral("qrc:/audio/match.wav")));
+    m_matchSound->setVolume(0.65f);
+
+    m_laserSound->setSource(QUrl(QStringLiteral("qrc:/audio/laser.wav")));
+    m_laserSound->setVolume(0.72f);
 
     setStyleSheet(QStringLiteral(
         "#gameHeaderCard, #boardCard {"
@@ -131,8 +183,8 @@ GamePage::GamePage(QWidget *parent)
         "  border-radius: 24px;"
         "}"
         "#boardWidget {"
-        "  background: rgba(255, 248, 240, 220);"
-        "  border: 1px solid rgba(201, 187, 177, 72);"
+        "  background: rgba(236, 211, 166, 214);"
+        "  border: 1px solid rgba(186, 156, 116, 88);"
         "  border-radius: 26px;"
         "}"
         "#gameEyebrow {"
@@ -200,7 +252,7 @@ void GamePage::startNewRound()
     m_clearedCounts.fill(0, tileKindsForDifficulty(m_difficulty).size());
     m_selectedCell = QPoint(-1, -1);
     m_roundFinished = false;
-    m_statusMessage = QStringLiteral("选中一个格子，再点相邻格子交换。四连会生成行/列消，五连会生成炸弹。");
+    m_statusMessage = QStringLiteral("先选中一个格子，再点击相邻格子进行交换。四连会生成行/列消除，五连会生成炸弹。");
 
     rebuildBoardWidgets();
     initializeBoard();
@@ -240,7 +292,7 @@ void GamePage::rebuildBoardWidgets()
     m_boardWidget->setFixedSize(config.cols * kBoardCellSize, config.rows * kBoardCellSize);
 
     for (int index = 0; index < total; ++index) {
-        auto *cell = new QPushButton(this);
+        auto *cell = new QPushButton(m_boardWidget);
         cell->setCursor(Qt::PointingHandCursor);
         cell->setMinimumSize(kBoardCellSize, kBoardCellSize);
         cell->setMaximumSize(kBoardCellSize, kBoardCellSize);
@@ -299,6 +351,7 @@ void GamePage::updateBoardView()
 {
     const auto config = configForDifficulty(m_difficulty);
     m_specialTilesLeft = 0;
+    syncBoardCellGeometry();
 
     for (int row = 0; row < config.rows; ++row) {
         for (int col = 0; col < config.cols; ++col) {
@@ -373,27 +426,138 @@ void GamePage::updateHeaderText()
     m_hintLabel->setText(hint);
 }
 
+QRect GamePage::cellRect(int row, int col) const
+{
+    return QRect(col * kBoardCellSize, row * kBoardCellSize, kBoardCellSize, kBoardCellSize);
+}
+
+void GamePage::syncBoardCellGeometry()
+{
+    const auto config = configForDifficulty(m_difficulty);
+    for (int row = 0; row < config.rows; ++row) {
+        for (int col = 0; col < config.cols; ++col) {
+            const int index = boardIndex(row, col);
+            if (index < 0 || index >= m_boardCells.size()) {
+                continue;
+            }
+
+            m_boardCells.at(index)->setGeometry(cellRect(row, col));
+        }
+    }
+}
+
+void GamePage::animateClearedTiles(const QSet<int> &matchedIndexes)
+{
+    if (matchedIndexes.isEmpty()) {
+        return;
+    }
+
+    m_animating = true;
+    auto *group = new QParallelAnimationGroup(this);
+
+    for (const int index : matchedIndexes) {
+        if (index < 0 || index >= m_boardCells.size()) {
+            continue;
+        }
+
+        auto *cell = m_boardCells.at(index);
+        QRect startGeometry = cellRect(index / configForDifficulty(m_difficulty).cols, index % configForDifficulty(m_difficulty).cols);
+        cell->setGeometry(startGeometry);
+        QRect endGeometry = startGeometry.adjusted(6, 6, -6, -6);
+
+        auto *opacityEffect = new QGraphicsOpacityEffect(cell);
+        opacityEffect->setOpacity(1.0);
+        cell->setGraphicsEffect(opacityEffect);
+
+        auto *scaleAnimation = new QPropertyAnimation(cell, "geometry", group);
+        scaleAnimation->setDuration(kClearAnimationMs);
+        scaleAnimation->setStartValue(startGeometry);
+        scaleAnimation->setEndValue(endGeometry);
+
+        auto *fadeAnimation = new QPropertyAnimation(opacityEffect, "opacity", group);
+        fadeAnimation->setDuration(kClearAnimationMs);
+        fadeAnimation->setStartValue(1.0);
+        fadeAnimation->setEndValue(0.0);
+
+        group->addAnimation(scaleAnimation);
+        group->addAnimation(fadeAnimation);
+    }
+
+    runAnimationGroup(group);
+
+    for (const int index : matchedIndexes) {
+        if (index < 0 || index >= m_boardCells.size()) {
+            continue;
+        }
+
+        auto *cell = m_boardCells.at(index);
+        if (auto *effect = cell->graphicsEffect()) {
+            effect->deleteLater();
+            cell->setGraphicsEffect(nullptr);
+        }
+    }
+
+    syncBoardCellGeometry();
+    m_animating = false;
+}
+
+void GamePage::animateFallingTiles(const QVector<FallingStep> &steps)
+{
+    if (steps.isEmpty()) {
+        return;
+    }
+
+    m_animating = true;
+    auto *group = new QParallelAnimationGroup(this);
+
+    for (const FallingStep &step : steps) {
+        const int index = boardIndex(step.toRow, step.col);
+        if (index < 0 || index >= m_boardCells.size()) {
+            continue;
+        }
+
+        auto *cell = m_boardCells.at(index);
+        const QRect finalGeometry = cellRect(step.toRow, step.col);
+        cell->setGeometry(finalGeometry);
+        QRect startGeometry = finalGeometry;
+        const int rowDelta = step.toRow - step.fromRow;
+        startGeometry.translate(0, -rowDelta * kBoardCellSize);
+        cell->setGeometry(startGeometry);
+
+        auto *fallAnimation = new QPropertyAnimation(cell, "geometry", group);
+        fallAnimation->setDuration(220 + qMin(rowDelta, 6) * 22);
+        fallAnimation->setStartValue(startGeometry);
+        fallAnimation->setEndValue(finalGeometry);
+        fallAnimation->setEasingCurve(QEasingCurve::OutBounce);
+        group->addAnimation(fallAnimation);
+    }
+
+    runAnimationGroup(group);
+    syncBoardCellGeometry();
+    m_animating = false;
+}
+
 QString GamePage::tileColor(int kind) const
 {
     static const QStringList colors = {
-        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fff8e8, stop:1 #f6e8c9)"),
-        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f9efe3, stop:1 #edd8c4)"),
-        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #eef8ea, stop:1 #d9ebd0)"),
-        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #edf5ff, stop:1 #d8e8fb)"),
-        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f4efff, stop:1 #e2d7f8)"),
-        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fff0f1, stop:1 #f7dadd)")
+        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f4ddb2, stop:1 #e8c98f)"),
+        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #eccb9f, stop:1 #dfb985)"),
+        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ead8a8, stop:1 #dbbe7f)"),
+        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f0d7aa, stop:1 #e3bd84)"),
+        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #eed5ae, stop:1 #ddb57e)"),
+        QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f2d6b3, stop:1 #e2b889)")
     };
 
-    return colors.value(kind % colors.size(), QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 white, stop:1 #f4f4f4)"));
+    return colors.value(kind % colors.size(), QStringLiteral("qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f0d8b1, stop:1 #ddb683)"));
 }
 
 GamePage::Match3DisplayConfig GamePage::configForDifficulty(Difficulty difficulty) const
 {
     if (difficulty == Difficulty::Hard) {
-        return {9, 9, 27, 4500};
+        return {9, 9, 27, 3200};
     }
 
-    return {9, 9, 32, 3200};
+    return {9, 9, 32, 2000};
 }
 
 bool GamePage::hasImmediateMatchAt(const QVector<TileData> &board, int row, int col) const
@@ -478,8 +642,12 @@ QVector<GamePage::MatchGroup> GamePage::collectMatchGroups(const QVector<TileDat
 
 void GamePage::handleCellClicked(int row, int col)
 {
+    if (m_animating) {
+        return;
+    }
+
     if (m_roundFinished) {
-        m_statusMessage = QStringLiteral("本局已经结算，请重新开局或返回主页。");
+        m_statusMessage = QStringLiteral("本局已经结算，请重新开局或返回上一页。");
         updateHeaderText();
         return;
     }
@@ -495,7 +663,8 @@ void GamePage::handleCellClicked(int row, int col)
     if (m_selectedCell == QPoint(-1, -1) && clickedTile.special == SpecialType::Bomb) {
         QSet<int> matchedIndexes;
         matchedIndexes.insert(boardIndex(row, col));
-        const int activatedSpecialCount = expandSpecialEffects(m_boardTiles, matchedIndexes);
+        QVector<SpecialSpawn> triggeredSpecials;
+        const int activatedSpecialCount = expandSpecialEffects(m_boardTiles, matchedIndexes, &triggeredSpecials);
 
         for (const int index : matchedIndexes) {
             const int kindIndex = m_boardTiles.at(index).kind;
@@ -504,15 +673,23 @@ void GamePage::handleCellClicked(int row, int col)
             }
         }
 
+        animateClearedTiles(matchedIndexes);
+        triggerBeamAnimations(triggeredSpecials);
         m_score += matchedIndexes.size() * kScorePerTile;
-        collapseBoard(matchedIndexes);
+        const QVector<FallingStep> fallingSteps = collapseBoard(matchedIndexes);
+        updateBoardView();
+        animateFallingTiles(fallingSteps);
         --m_movesLeft;
+        if (activatedSpecialCount > 0) {
+            playLaserSound();
+        } else {
+            playMatchSound();
+        }
         m_statusMessage = QStringLiteral("已触发九宫格炸弹，消除了 %1 个元素。").arg(matchedIndexes.size());
         if (activatedSpecialCount > 0) {
             m_statusMessage += QStringLiteral(" 连锁触发特殊元素 %1 次。").arg(activatedSpecialCount);
         }
 
-        updateBoardView();
         updateHeaderText();
 
         if (m_score >= configForDifficulty(m_difficulty).targetScore) {
@@ -541,7 +718,7 @@ void GamePage::handleCellClicked(int row, int col)
 
     if (!isAdjacent(m_selectedCell, clicked)) {
         m_selectedCell = clicked;
-        m_statusMessage = QStringLiteral("只能和上下左右相邻元素交换，已切换选中格子。");
+        m_statusMessage = QStringLiteral("只能和上下左右相邻元素交换，已切换当前选中格子。");
         updateBoardView();
         updateHeaderText();
         return;
@@ -559,6 +736,8 @@ void GamePage::handleCellClicked(int row, int col)
 
     swapCells(m_boardTiles, m_selectedCell, clicked);
     m_selectedCell = QPoint(-1, -1);
+    updateBoardView();
+    updateHeaderText();
 
     int generatedSpecialCount = 0;
     int activatedSpecialCount = 0;
@@ -615,7 +794,8 @@ void GamePage::resolveMove(const QPoint &preferredSpecialPosition, int &generate
 
         const QVector<SpecialSpawn> spawns = createSpecialSpawns(currentBoard, groups, currentPreferredPosition);
         generatedSpecialCount += applySpecialCreation(currentBoard, matchedIndexes, spawns);
-        activatedSpecialCount += expandSpecialEffects(currentBoard, matchedIndexes);
+        QVector<SpecialSpawn> triggeredSpecials;
+        activatedSpecialCount += expandSpecialEffects(currentBoard, matchedIndexes, &triggeredSpecials);
 
         for (const int index : matchedIndexes) {
             const int kindIndex = currentBoard.at(index).kind;
@@ -626,12 +806,21 @@ void GamePage::resolveMove(const QPoint &preferredSpecialPosition, int &generate
 
         totalCleared += matchedIndexes.size();
         m_boardTiles = currentBoard;
-        collapseBoard(matchedIndexes);
+        animateClearedTiles(matchedIndexes);
+        triggerBeamAnimations(triggeredSpecials);
+        const QVector<FallingStep> fallingSteps = collapseBoard(matchedIndexes);
+        updateBoardView();
+        animateFallingTiles(fallingSteps);
         currentBoard = m_boardTiles;
         currentPreferredPosition = QPoint(-1, -1);
     }
 
     m_score += totalCleared * kScorePerTile;
+    if (activatedSpecialCount > 0) {
+        playLaserSound();
+    } else if (totalCleared > 0) {
+        playMatchSound();
+    }
     if (totalCleared > 0 && generatedSpecialCount == 0 && activatedSpecialCount == 0) {
         m_statusMessage = QStringLiteral("成功消除了 %1 个元素，当前基础分 %2。").arg(totalCleared).arg(m_score);
     }
@@ -696,7 +885,10 @@ int GamePage::applySpecialCreation(QVector<TileData> &board, QSet<int> &matchedI
     return generatedCount;
 }
 
-int GamePage::expandSpecialEffects(const QVector<TileData> &board, QSet<int> &matchedIndexes) const
+int GamePage::expandSpecialEffects(
+    const QVector<TileData> &board,
+    QSet<int> &matchedIndexes,
+    QVector<SpecialSpawn> *triggeredSpecials) const
 {
     const auto config = configForDifficulty(m_difficulty);
     QSet<int> activatedIndexes;
@@ -717,6 +909,9 @@ int GamePage::expandSpecialEffects(const QVector<TileData> &board, QSet<int> &ma
                 activatedIndexes.insert(index);
 
                 if (tile.special == SpecialType::RowClear) {
+                    if (triggeredSpecials) {
+                        triggeredSpecials->push_back({QPoint(row, col), tile.kind, SpecialType::RowClear});
+                    }
                     for (int clearCol = 0; clearCol < config.cols; ++clearCol) {
                         const int target = boardIndex(row, clearCol);
                         if (!matchedIndexes.contains(target)) {
@@ -727,6 +922,9 @@ int GamePage::expandSpecialEffects(const QVector<TileData> &board, QSet<int> &ma
                 }
 
                 if (tile.special == SpecialType::ColClear) {
+                    if (triggeredSpecials) {
+                        triggeredSpecials->push_back({QPoint(row, col), tile.kind, SpecialType::ColClear});
+                    }
                     for (int clearRow = 0; clearRow < config.rows; ++clearRow) {
                         const int target = boardIndex(clearRow, col);
                         if (!matchedIndexes.contains(target)) {
@@ -758,35 +956,42 @@ int GamePage::expandSpecialEffects(const QVector<TileData> &board, QSet<int> &ma
     return activatedIndexes.size();
 }
 
-void GamePage::collapseBoard(const QSet<int> &matchedIndexes)
+QVector<GamePage::FallingStep> GamePage::collapseBoard(const QSet<int> &matchedIndexes)
 {
     const auto config = configForDifficulty(m_difficulty);
     QVector<TileData> nextBoard(config.rows * config.cols);
+    QVector<FallingStep> steps;
 
     for (int col = 0; col < config.cols; ++col) {
         QVector<TileData> survivors;
+        QVector<int> survivorRows;
         survivors.reserve(config.rows);
+        survivorRows.reserve(config.rows);
 
         for (int row = config.rows - 1; row >= 0; --row) {
             const TileData tile = m_boardTiles.at(boardIndex(row, col));
             if (!matchedIndexes.contains(boardIndex(row, col))) {
                 survivors.push_back(tile);
+                survivorRows.push_back(row);
             }
         }
 
         int writeRow = config.rows - 1;
-        for (const TileData &tile : survivors) {
-            nextBoard[boardIndex(writeRow, col)] = tile;
+        for (int index = 0; index < survivors.size(); ++index) {
+            nextBoard[boardIndex(writeRow, col)] = survivors.at(index);
+            steps.push_back({survivorRows.at(index), writeRow, col});
             --writeRow;
         }
 
         while (writeRow >= 0) {
             nextBoard[boardIndex(writeRow, col)] = TileData{randomKind(), SpecialType::None};
+            steps.push_back({writeRow - config.rows, writeRow, col});
             --writeRow;
         }
     }
 
     m_boardTiles = nextBoard;
+    return steps;
 }
 
 void GamePage::finishRound(bool clearedTarget)
@@ -829,7 +1034,7 @@ void GamePage::finishRound(bool clearedTarget)
     QString detailText;
     if (clearedTarget) {
         detailText = QStringLiteral(
-            "你已完成目标分数。\n\n基础分：%1\n剩余步数加分：%2\n特殊元素加分：%3\n最终总分：%4\n金币奖励：+%5")
+            "你已完成目标分数。\n\n基础分：%1\n剩余步数加分：%2\n特殊元素加分：%3\n最终总分：%4\n金币奖励：%5")
                          .arg(result.baseScore)
                          .arg(result.moveBonusScore)
                          .arg(result.specialBonusScore)
@@ -907,4 +1112,128 @@ int GamePage::settleRemainingSpecialTiles(int &activatedSpecialCount) const
 
     activatedSpecialCount = expandSpecialEffects(m_boardTiles, matchedIndexes);
     return matchedIndexes.size();
+}
+
+void GamePage::playMatchSound()
+{
+    if (m_matchSound->isLoaded()) {
+        m_matchSound->play();
+    }
+}
+
+void GamePage::playLaserSound()
+{
+    if (m_laserSound->isLoaded()) {
+        m_laserSound->play();
+    }
+}
+
+void GamePage::renderBeamOverlay()
+{
+    if (m_beamAnimations.isEmpty()) {
+        m_beamOverlay->hide();
+        m_beamOverlay->clear();
+        return;
+    }
+
+    m_beamOverlay->setGeometry(rect());
+    QPixmap overlay(size());
+    overlay.fill(Qt::transparent);
+
+    QPainter painter(&overlay);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    for (const BeamAnimation &beam : std::as_const(m_beamAnimations)) {
+        QColor glow = beam.color;
+        glow.setAlphaF(0.65 * (1.0 - beam.progress));
+
+        const qreal thickness = 16.0;
+        QRectF drawRect = beam.rect;
+
+        if (beam.horizontal) {
+            drawRect.setWidth(beam.rect.width() * beam.progress);
+            drawRect.setTop(beam.rect.center().y() - thickness / 2.0);
+            drawRect.setHeight(thickness);
+        } else {
+            drawRect.setHeight(beam.rect.height() * beam.progress);
+            drawRect.setLeft(beam.rect.center().x() - thickness / 2.0);
+            drawRect.setWidth(thickness);
+        }
+
+        QLinearGradient gradient(drawRect.topLeft(), beam.horizontal ? drawRect.topRight() : drawRect.bottomLeft());
+        QColor strong = glow;
+        strong.setAlphaF(0.92 * (1.0 - beam.progress * 0.35));
+        QColor soft = glow;
+        soft.setAlphaF(0.12);
+        gradient.setColorAt(0.0, soft);
+        gradient.setColorAt(0.18, strong);
+        gradient.setColorAt(0.82, strong);
+        gradient.setColorAt(1.0, soft);
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(gradient);
+        painter.drawRoundedRect(drawRect, thickness / 2.0, thickness / 2.0);
+    }
+
+    m_beamOverlay->setPixmap(overlay);
+    m_beamOverlay->show();
+    m_beamOverlay->raise();
+}
+
+void GamePage::triggerBeamAnimations(const QVector<SpecialSpawn> &triggeredSpecials)
+{
+    const auto config = configForDifficulty(m_difficulty);
+    const QPoint boardOrigin = m_boardWidget->mapTo(this, QPoint(0, 0));
+
+    for (const SpecialSpawn &spawn : triggeredSpecials) {
+        if (spawn.special != SpecialType::RowClear && spawn.special != SpecialType::ColClear) {
+            continue;
+        }
+
+        BeamAnimation beam;
+        beam.horizontal = spawn.special == SpecialType::RowClear;
+        beam.progress = 0.0;
+        beam.color = QColor(129, 191, 255, 230);
+
+        if (beam.horizontal) {
+            const int y = boardOrigin.y() + spawn.position.x() * kBoardCellSize;
+            beam.rect = QRect(boardOrigin.x(), y, config.cols * kBoardCellSize, kBoardCellSize);
+        } else {
+            const int x = boardOrigin.x() + spawn.position.y() * kBoardCellSize;
+            beam.rect = QRect(x, boardOrigin.y(), kBoardCellSize, config.rows * kBoardCellSize);
+        }
+
+        m_beamAnimations.push_back(beam);
+    }
+
+    if (!m_beamAnimations.isEmpty() && !m_beamTimer->isActive()) {
+        renderBeamOverlay();
+        m_beamTimer->start(kBeamFrameMs);
+    }
+}
+
+void GamePage::advanceBeamAnimations()
+{
+    bool anyActive = false;
+
+    for (BeamAnimation &beam : m_beamAnimations) {
+        beam.progress = qMin(1.0, beam.progress + 0.16);
+        if (beam.progress < 1.0) {
+            anyActive = true;
+        }
+    }
+
+    m_beamAnimations.erase(
+        std::remove_if(
+            m_beamAnimations.begin(),
+            m_beamAnimations.end(),
+            [](const BeamAnimation &beam) { return beam.progress >= 1.0; }),
+        m_beamAnimations.end());
+
+    renderBeamOverlay();
+
+    if (!anyActive || m_beamAnimations.isEmpty()) {
+        m_beamTimer->stop();
+        renderBeamOverlay();
+    }
 }

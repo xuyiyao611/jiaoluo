@@ -46,6 +46,9 @@ struct FoodInventory {
     int count = 0;
 };
 
+inline constexpr int kCharacterUnlockFragments = 60;
+inline constexpr int kFragmentsPerBonusCoin = 20;
+
 QVector<CharacterProgress> createInitialCharacterProgress();
 QVector<FoodInventory> createInitialFoodInventory();
 

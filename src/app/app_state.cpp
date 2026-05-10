@@ -210,11 +210,11 @@ int foodPrice(FoodKind kind)
 {
     switch (kind) {
     case FoodKind::Pudding:
-        return 20;
+        return 10;
     case FoodKind::Soda:
-        return 30;
+        return 15;
     case FoodKind::Popsicle:
-        return 40;
+        return 20;
     }
 
     return 0;
