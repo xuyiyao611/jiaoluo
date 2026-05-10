@@ -62,6 +62,7 @@ void MainWindow::bindSignals()
     connect(m_difficultySelectPage, &DifficultySelectPage::difficultyChosen, this, [this](Difficulty difficulty) {
         m_state.selectedDifficulty = difficulty;
         syncStateToViews();
+        m_gamePage->startNewRound();
         switchScene(SceneKey::Game);
     });
 
