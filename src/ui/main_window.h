@@ -25,6 +25,7 @@ private:
     void switchScene(SceneKey scene);
     void resetForNewGame();
     QString buildRoundSummary(const Match3RoundResult &result) const;
+    void applyFragmentRewards(const Match3RoundResult &result);
 
     AppState m_state;
     QStackedWidget *m_stack;

@@ -19,6 +19,8 @@ struct Match3RoundResult {
     int movesUsed = 0;
     int movesLeft = 0;
     Difficulty difficulty = Difficulty::Easy;
+    QVector<int> clearedCounts;
+    QVector<CharacterKind> activeKinds;
 };
 
 Q_DECLARE_METATYPE(Match3RoundResult)
@@ -67,6 +69,7 @@ private:
     void finishRound(bool clearedTarget);
     int boardIndex(int row, int col) const;
     int randomKind() const;
+    CharacterKind kindForIndex(int kind) const;
     bool hasPlayableState() const;
 
     Difficulty m_difficulty;
@@ -80,6 +83,7 @@ private:
     QGridLayout *m_boardLayout;
     QVector<QPushButton *> m_boardCells;
     QVector<int> m_boardKinds;
+    QVector<int> m_clearedCounts;
     QPoint m_selectedCell;
     QString m_statusMessage;
     bool m_roundFinished;

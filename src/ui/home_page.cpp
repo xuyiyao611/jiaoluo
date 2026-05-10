@@ -8,13 +8,13 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QPushButton>
-#include <QStringList>
 #include <QVBoxLayout>
 
 HomePage::HomePage(QWidget *parent)
     : QWidget(parent),
       m_coinLabel(new QLabel(this)),
-      m_lastRoundLabel(new QLabel(this))
+      m_lastRoundLabel(new QLabel(this)),
+      m_characterGrid(new QGridLayout())
 {
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(36, 28, 36, 28);
@@ -39,7 +39,7 @@ HomePage::HomePage(QWidget *parent)
     subtitleLabel->setObjectName(QStringLiteral("homeSubtitle"));
 
     auto *descLabel = new QLabel(
-        QStringLiteral("挑战成功后领取金币奖励，后续会继续把碎片、角色、商店和喂食系统完整迁移到 Qt / C++ 版本。"),
+        QStringLiteral("挑战成功后会把本局消除数量转成对应角色碎片。累计到 200 碎片即可视为兑换角色，超出的碎片每 20 个自动转成 1 金币。"),
         leftCard);
     descLabel->setWordWrap(true);
     descLabel->setObjectName(QStringLiteral("homeDesc"));
@@ -79,45 +79,21 @@ HomePage::HomePage(QWidget *parent)
     m_lastRoundLabel->setWordWrap(true);
     setLastRoundSummary(QStringLiteral("最近一局：还没有结算记录，先开始一局吧。"));
 
-    auto *infoLabel = new QLabel(QStringLiteral("Qt 迁移阶段：主页、难度选择和首个可玩三消棋盘已经接通。"), rightCard);
+    auto *infoLabel = new QLabel(QStringLiteral("Qt 迁移阶段：已接通主页、难度选择、三消结算、碎片累计与角色兑换展示。"), rightCard);
     infoLabel->setWordWrap(true);
     infoLabel->setObjectName(QStringLiteral("statusHeadline"));
 
-    auto *grid = new QGridLayout();
-    grid->setHorizontalSpacing(12);
-    grid->setVerticalSpacing(12);
+    auto *collectionTitle = new QLabel(QStringLiteral("角色收集"), rightCard);
+    collectionTitle->setObjectName(QStringLiteral("sectionTitle"));
 
-    const QStringList items = {
-        QStringLiteral("启动页已迁移"),
-        QStringLiteral("主页已迁移"),
-        QStringLiteral("难度页已接通"),
-        QStringLiteral("三消玩法首版可玩")
-    };
-
-    for (int index = 0; index < items.size(); ++index) {
-        auto *card = new QFrame(rightCard);
-        card->setObjectName(QStringLiteral("statusItemCard"));
-
-        auto *cardLayout = new QVBoxLayout(card);
-        cardLayout->setContentsMargins(16, 14, 16, 14);
-        cardLayout->setSpacing(4);
-
-        auto *indexLabel = new QLabel(QStringLiteral("S%1").arg(index + 1), card);
-        indexLabel->setObjectName(QStringLiteral("statusItemIndex"));
-
-        auto *textLabel = new QLabel(items.at(index), card);
-        textLabel->setWordWrap(true);
-        textLabel->setObjectName(QStringLiteral("statusItemText"));
-
-        cardLayout->addWidget(indexLabel);
-        cardLayout->addWidget(textLabel);
-        grid->addWidget(card, index / 2, index % 2);
-    }
+    m_characterGrid->setHorizontalSpacing(12);
+    m_characterGrid->setVerticalSpacing(12);
 
     rightLayout->addWidget(m_coinLabel, 0, Qt::AlignLeft);
     rightLayout->addWidget(infoLabel);
     rightLayout->addWidget(m_lastRoundLabel);
-    rightLayout->addLayout(grid);
+    rightLayout->addWidget(collectionTitle);
+    rightLayout->addLayout(m_characterGrid);
     rightLayout->addStretch();
 
     heroLayout->addWidget(leftCard, 3);
@@ -129,14 +105,14 @@ HomePage::HomePage(QWidget *parent)
     featureGrid->setVerticalSpacing(16);
 
     const QStringList titles = {
-        QStringLiteral("安静的小棋盘"),
-        QStringLiteral("赢了才有奖励"),
-        QStringLiteral("后续继续迁移")
+        QStringLiteral("当前已完成"),
+        QStringLiteral("奖励规则"),
+        QStringLiteral("下一步迁移")
     };
     const QStringList descriptions = {
-        QStringLiteral("9 x 9 棋盘配合 6 类元素，当前已支持真实交换、三连消除与自动补位。"),
-        QStringLiteral("只有挑战成功后才会发放金币奖励，保持和原项目一致的核心规则。"),
-        QStringLiteral("碎片、角色兑换、商店、喂食、好感度与突破系统会在后续阶段继续迁到 Qt。")
+        QStringLiteral("9 x 9 棋盘、6 元素池、真实交换、三连消除、补位、局内结算。"),
+        QStringLiteral("只有挑战成功后才发金币和碎片；每消除 1 个元素就获得 1 个对应碎片。"),
+        QStringLiteral("后续继续迁移商店、喂食、好感度、突破与角色插图。")
     };
 
     for (int index = 0; index < titles.size(); ++index) {
@@ -186,7 +162,7 @@ HomePage::HomePage(QWidget *parent)
         "  font-size: 28px;"
         "  font-weight: 700;"
         "}"
-        "#homeDesc, #featureDesc, #statusHeadline, #statusItemText {"
+        "#homeDesc, #featureDesc, #statusHeadline {"
         "  color: #887a73;"
         "  font-size: 15px;"
         "  line-height: 1.6;"
@@ -219,7 +195,7 @@ HomePage::HomePage(QWidget *parent)
         "  font-size: 16px;"
         "  font-weight: 800;"
         "}"
-        "#statusHeadline {"
+        "#statusHeadline, #sectionTitle {"
         "  color: #716662;"
         "  font-size: 17px;"
         "  font-weight: 700;"
@@ -232,25 +208,33 @@ HomePage::HomePage(QWidget *parent)
         "  font-size: 14px;"
         "  font-weight: 600;"
         "}"
-        "#statusItemCard, #featureCard {"
+        "#statusItemCard, #featureCard, #characterCard {"
         "  background: rgba(255, 255, 255, 208);"
         "  border: 1px solid rgba(195, 181, 169, 95);"
         "  border-radius: 22px;"
         "}"
-        "#statusItemIndex {"
-        "  color: #b88c77;"
-        "  font-size: 12px;"
-        "  font-weight: 700;"
-        "}"
-        "#statusItemText, #featureTitle {"
+        "#featureTitle, #characterName {"
         "  color: #716662;"
         "  font-size: 18px;"
         "  font-weight: 700;"
         "}"
-        "#featureTitle {"
-        "  color: #6f615b;"
+        "#characterSymbol {"
+        "  color: #8b7264;"
+        "  font-size: 22px;"
+        "  font-weight: 800;"
+        "}"
+        "#characterMeta {"
+        "  color: #887a73;"
+        "  font-size: 13px;"
+        "}"
+        "#characterLock {"
+        "  color: #b89f92;"
+        "  font-size: 13px;"
+        "  font-weight: 700;"
         "}"
     ));
+
+    setCharacterProgress(createInitialCharacterProgress());
 }
 
 void HomePage::setCoins(int coins)
@@ -261,6 +245,49 @@ void HomePage::setCoins(int coins)
 void HomePage::setLastRoundSummary(const QString &summary)
 {
     m_lastRoundLabel->setText(summary);
+}
+
+void HomePage::setCharacterProgress(const QVector<CharacterProgress> &characters)
+{
+    while (QLayoutItem *item = m_characterGrid->takeAt(0)) {
+        if (item->widget()) {
+            item->widget()->deleteLater();
+        }
+        delete item;
+    }
+
+    for (int index = 0; index < characters.size(); ++index) {
+        const CharacterProgress &progress = characters.at(index);
+
+        auto *card = new QFrame(this);
+        card->setObjectName(QStringLiteral("characterCard"));
+        auto *cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(14, 14, 14, 14);
+        cardLayout->setSpacing(6);
+
+        auto *symbolLabel = new QLabel(characterSymbol(progress.kind), card);
+        symbolLabel->setObjectName(QStringLiteral("characterSymbol"));
+
+        auto *nameLabel = new QLabel(characterName(progress.kind), card);
+        nameLabel->setObjectName(QStringLiteral("characterName"));
+
+        auto *fragmentLabel = new QLabel(
+            QStringLiteral("碎片：%1 / 200").arg(progress.fragments),
+            card);
+        fragmentLabel->setObjectName(QStringLiteral("characterMeta"));
+
+        auto *statusLabel = new QLabel(
+            progress.unlocked ? QStringLiteral("已兑换") : QStringLiteral("未兑换"),
+            card);
+        statusLabel->setObjectName(progress.unlocked ? QStringLiteral("characterMeta") : QStringLiteral("characterLock"));
+
+        cardLayout->addWidget(symbolLabel);
+        cardLayout->addWidget(nameLabel);
+        cardLayout->addWidget(fragmentLabel);
+        cardLayout->addWidget(statusLabel);
+
+        m_characterGrid->addWidget(card, index / 4, index % 4);
+    }
 }
 
 void HomePage::paintEvent(QPaintEvent *event)

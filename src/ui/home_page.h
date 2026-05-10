@@ -1,8 +1,12 @@
 #pragma once
 
+#include <QVector>
 #include <QWidget>
 
+#include "app/app_state.h"
+
 class QLabel;
+class QGridLayout;
 
 class HomePage : public QWidget
 {
@@ -13,6 +17,7 @@ public:
 
     void setCoins(int coins);
     void setLastRoundSummary(const QString &summary);
+    void setCharacterProgress(const QVector<CharacterProgress> &characters);
 
 signals:
     void startRequested();
@@ -24,4 +29,5 @@ protected:
 private:
     QLabel *m_coinLabel;
     QLabel *m_lastRoundLabel;
+    QGridLayout *m_characterGrid;
 };

@@ -7,6 +7,13 @@
 #include "home_page.h"
 #include "landing_page.h"
 
+namespace {
+
+constexpr int kFragmentsPerCharacter = 200;
+constexpr int kFragmentsPerBonusCoin = 20;
+
+} // namespace
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       m_stack(new QStackedWidget(this)),
@@ -77,6 +84,7 @@ void MainWindow::bindSignals()
     connect(m_gamePage, &GamePage::roundFinished, this, [this](const Match3RoundResult &result) {
         if (result.clearedTarget) {
             m_state.coins += result.coinReward;
+            applyFragmentRewards(result);
         }
 
         m_state.lastRoundSummary = buildRoundSummary(result);
@@ -98,6 +106,7 @@ void MainWindow::syncStateToViews()
 {
     m_homePage->setCoins(m_state.coins);
     m_homePage->setLastRoundSummary(m_state.lastRoundSummary);
+    m_homePage->setCharacterProgress(m_state.characters);
     m_difficultySelectPage->setSelectedDifficulty(m_state.selectedDifficulty);
     m_gamePage->setCoins(m_state.coins);
     m_gamePage->setDifficulty(m_state.selectedDifficulty);
@@ -126,12 +135,13 @@ void MainWindow::switchScene(SceneKey scene)
 void MainWindow::resetForNewGame()
 {
     m_state = AppState{};
+    m_state.characters = createInitialCharacterProgress();
     syncStateToViews();
 }
 
 QString MainWindow::buildRoundSummary(const Match3RoundResult &result) const
 {
-    const QString difficultyText = result.difficulty == Difficulty::Hard ? QStringLiteral("困难模式") : QStringLiteral("简单模式");
+    const QString difficultyText = difficultyLabel(result.difficulty);
     if (result.clearedTarget) {
         return QStringLiteral(
                    "最近一局：%1挑战成功，基础分 %2，步数奖励 %3，最终总分 %4，金币 +%5。")
@@ -145,4 +155,28 @@ QString MainWindow::buildRoundSummary(const Match3RoundResult &result) const
     return QStringLiteral("最近一局：%1挑战失败，基础分 %2，未获得金币奖励。")
         .arg(difficultyText)
         .arg(result.baseScore);
+}
+
+void MainWindow::applyFragmentRewards(const Match3RoundResult &result)
+{
+    for (int index = 0; index < result.activeKinds.size() && index < result.clearedCounts.size(); ++index) {
+        const CharacterKind kind = result.activeKinds.at(index);
+        const int gain = result.clearedCounts.at(index);
+
+        for (CharacterProgress &progress : m_state.characters) {
+            if (progress.kind != kind) {
+                continue;
+            }
+
+            const int previousFragments = progress.fragments;
+            const int nextFragments = previousFragments + gain;
+            const int previousBonusCoins = qMax(previousFragments - kFragmentsPerCharacter, 0) / kFragmentsPerBonusCoin;
+            const int nextBonusCoins = qMax(nextFragments - kFragmentsPerCharacter, 0) / kFragmentsPerBonusCoin;
+
+            progress.fragments = nextFragments;
+            progress.unlocked = progress.unlocked || nextFragments >= kFragmentsPerCharacter;
+            m_state.coins += nextBonusCoins - previousBonusCoins;
+            break;
+        }
+    }
 }

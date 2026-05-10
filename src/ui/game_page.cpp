@@ -11,12 +11,10 @@
 #include <QPushButton>
 #include <QRandomGenerator>
 #include <QSet>
-#include <QStringList>
 #include <QVBoxLayout>
 
 namespace {
 
-constexpr int kTileKindCount = 6;
 constexpr int kScorePerTile = 20;
 constexpr int kScorePerMoveLeft = 100;
 constexpr int kScoreToCoinDivisor = 100;
@@ -172,6 +170,7 @@ void GamePage::startNewRound()
     const auto config = configForDifficulty(m_difficulty);
     m_score = 0;
     m_movesLeft = config.moveLimit;
+    m_clearedCounts.fill(0, tileKindsForDifficulty(m_difficulty).size());
     m_selectedCell = QPoint(-1, -1);
     m_roundFinished = false;
     m_statusMessage = QStringLiteral("选中一个格子，再点相邻格子交换。横向或纵向三个及以上相同元素会消除。");
@@ -302,7 +301,7 @@ void GamePage::updateBoardView()
 void GamePage::updateHeaderText()
 {
     const auto config = configForDifficulty(m_difficulty);
-    const QString difficultyText = m_difficulty == Difficulty::Hard ? QStringLiteral("困难模式") : QStringLiteral("简单模式");
+    const QString difficultyText = difficultyLabel(m_difficulty);
 
     m_titleLabel->setText(QStringLiteral("角落消消 - %1").arg(difficultyText));
     m_metaLabel->setText(
@@ -326,16 +325,7 @@ void GamePage::updateHeaderText()
 
 QString GamePage::tileSymbol(int kind) const
 {
-    static const QStringList symbols = {
-        QStringLiteral("熊"),
-        QStringLiteral("鼠"),
-        QStringLiteral("龙"),
-        QStringLiteral("企"),
-        QStringLiteral("幽"),
-        QStringLiteral("猫")
-    };
-
-    return symbols.value(kind % symbols.size(), QStringLiteral("?"));
+    return characterSymbol(kindForIndex(kind));
 }
 
 QString GamePage::tileColor(int kind) const
@@ -543,7 +533,12 @@ void GamePage::resolveMatches(const QVector<QPoint> &matches)
         totalCleared += currentMatches.size();
 
         for (const QPoint &point : currentMatches) {
-            m_boardKinds[boardIndex(point.x(), point.y())] = -1;
+            const int cellIndex = boardIndex(point.x(), point.y());
+            const int kindIndex = m_boardKinds[cellIndex];
+            if (kindIndex >= 0 && kindIndex < m_clearedCounts.size()) {
+                m_clearedCounts[kindIndex] += 1;
+            }
+            m_boardKinds[cellIndex] = -1;
         }
 
         m_score += currentMatches.size() * kScorePerTile * chain;
@@ -610,6 +605,8 @@ void GamePage::finishRound(bool clearedTarget)
     result.movesLeft = m_movesLeft;
     result.movesUsed = config.moveLimit - m_movesLeft;
     result.difficulty = m_difficulty;
+    result.clearedCounts = m_clearedCounts;
+    result.activeKinds = tileKindsForDifficulty(m_difficulty);
 
     if (clearedTarget) {
         m_statusMessage = QStringLiteral("挑战成功，奖励已结算。");
@@ -650,7 +647,12 @@ int GamePage::boardIndex(int row, int col) const
 
 int GamePage::randomKind() const
 {
-    return QRandomGenerator::global()->bounded(kTileKindCount);
+    return QRandomGenerator::global()->bounded(tileKindsForDifficulty(m_difficulty).size());
+}
+
+CharacterKind GamePage::kindForIndex(int kind) const
+{
+    return tileKindsForDifficulty(m_difficulty).value(kind, CharacterKind::WhiteBear);
 }
 
 bool GamePage::hasPlayableState() const
